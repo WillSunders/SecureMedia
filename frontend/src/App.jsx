@@ -135,6 +135,9 @@ export default function App() {
   const handleCreateGroup = async () => {
     setFlowStatus("Creating group...");
     try {
+      if (!userId) throw new Error("Missing user ID");
+      const hasAgreement = localStorage.getItem("agreement_private_pem");
+      if (!hasAgreement) throw new Error("Generate keys + request certificate first");
       const group = await createGroup(groupName);
       setGroupId(String(group.id));
       await createGroupKeys(String(group.id), [String(userId)]);

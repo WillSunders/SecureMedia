@@ -7,8 +7,14 @@ function toBase64(bytes) {
   return btoa(binary);
 }
 
+function normalizeBase64(base64) {
+  const normalized = base64.replace(/-/g, "+").replace(/_/g, "/");
+  const pad = normalized.length % 4 === 0 ? "" : "=".repeat(4 - (normalized.length % 4));
+  return normalized + pad;
+}
+
 function fromBase64(base64) {
-  const binary = atob(base64);
+  const binary = atob(normalizeBase64(base64));
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i += 1) {
     bytes[i] = binary.charCodeAt(i);

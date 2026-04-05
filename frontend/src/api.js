@@ -154,6 +154,15 @@ export async function createGroupKeys(groupId, memberUserIds) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ group_id: String(groupId), member_user_ids: memberUserIds })
   });
-  if (!res.ok) throw new Error("Create group keys failed");
+  if (!res.ok) {
+    let detail = "";
+    try {
+      const data = await res.json();
+      detail = data.detail ? `: ${data.detail}` : "";
+    } catch {
+      detail = "";
+    }
+    throw new Error(`Create group keys failed${detail}`);
+  }
   return res.json();
 }
