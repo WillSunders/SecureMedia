@@ -262,6 +262,8 @@ Health checks:
 - Frontend app-server connectivity (health check): Done
 - Frontend base page + fake data: Done
 - Client-side crypto utilities (WebCrypto): Done
+- Frontend auth (register/login UI): Done
+- Frontend crypto flows (group create, wrapped key, encrypt/sign, decrypt/verify): Done
 - Crypto operations: Not started
 - Database schema/migrations: Not started
 - Auth + API endpoints: Not started

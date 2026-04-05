@@ -257,6 +257,44 @@ body {
   font-size: 0.8rem;
 }
 
+.auth {
+  display: grid;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.auth input {
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  font-size: 0.95rem;
+}
+
+.auth .row {
+  display: flex;
+  gap: 10px;
+}
+
+.auth button {
+  flex: 1;
+  border: none;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--brand);
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.auth .secondary {
+  background: #111827;
+}
+
+.auth .status {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
 @keyframes rise {
   from {
     opacity: 0;
