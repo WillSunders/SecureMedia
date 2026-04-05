@@ -54,6 +54,24 @@ export async function loginUser(username, password) {
   return res.json();
 }
 
+export async function fetchMe() {
+  const res = await fetch(`${appServer}/auth/me`, {
+    headers: { ...authHeaders() }
+  });
+  if (!res.ok) throw new Error("Fetch current user failed");
+  return res.json();
+}
+
+export async function registerCertificate(certPem, userId) {
+  const res = await fetch(`${appServer}/certificates/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ cert_pem: certPem, user_id: userId })
+  });
+  if (!res.ok) throw new Error("Register certificate failed");
+  return res.json();
+}
+
 export async function createGroup(name) {
   const res = await fetch(`${appServer}/groups`, {
     method: "POST",
@@ -102,6 +120,12 @@ export async function requestCertificate(payload) {
   return res.json();
 }
 
+export async function getCaCertificate() {
+  const res = await fetch(`${keyServer}/ca/certificate`);
+  if (!res.ok) throw new Error("Fetch CA certificate failed");
+  return res.json();
+}
+
 export async function getCurrentWrappedKey(groupId, userId) {
   const res = await fetch(
     `${keyServer}/groups/${groupId}/keys/current?user_id=${encodeURIComponent(userId)}`
@@ -121,5 +145,15 @@ export async function getWrappedKey(groupId, version, userId) {
 export async function getPublicKeys(userId) {
   const res = await fetch(`${keyServer}/public-keys/${userId}`);
   if (!res.ok) throw new Error("Fetch public keys failed");
+  return res.json();
+}
+
+export async function createGroupKeys(groupId, memberUserIds) {
+  const res = await fetch(`${keyServer}/groups/${groupId}/keys/create`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ group_id: String(groupId), member_user_ids: memberUserIds })
+  });
+  if (!res.ok) throw new Error("Create group keys failed");
   return res.json();
 }

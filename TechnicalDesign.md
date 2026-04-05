@@ -170,12 +170,14 @@ Removed users cannot decrypt future posts.
 ### App Server
 - POST /auth/register
 - POST /auth/login
+- GET /auth/me
 - POST /groups
 - GET /groups/:id
 - POST /groups/:id/members
 - DELETE /groups/:id/members/:userId
 - POST /groups/:id/posts
 - GET /groups/:id/posts
+- POST /certificates/register
 
 ### Key Server
 - POST /certificates/request
@@ -256,6 +258,7 @@ Health checks:
 - Service skeletons: Done
 - App server database models: Done
 - App server auth, groups, posts endpoints: Done
+- App server cert registry + /auth/me: Done
 - Key server API skeleton: Done
 - Key server crypto (ECDH + HKDF + AES-GCM, X.509 via cryptography): Done
 - Key server persistence (Postgres) + CA cert endpoint: Done

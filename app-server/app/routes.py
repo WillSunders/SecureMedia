@@ -1,4 +1,5 @@
 import base64
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -8,10 +9,13 @@ from .auth import create_access_token, decode_access_token, hash_password, verif
 from .db import get_session
 from .models import Certificate, Group, Membership, Post, User
 from .schemas import (
+    CertificateRegisterRequest,
+    CertificateRegisterResponse,
     GroupCreateRequest,
     GroupMemberAddRequest,
     GroupResponse,
     LoginRequest,
+    MeResponse,
     PostCreateRequest,
     PostResponse,
     RegisterRequest,
@@ -61,6 +65,34 @@ def login(payload: LoginRequest):
             raise HTTPException(status_code=401, detail="Invalid credentials")
         token = create_access_token(user.id)
         return TokenResponse(access_token=token)
+
+
+@router.get("/auth/me", response_model=MeResponse)
+def me(user_id: int = Depends(get_current_user_id)):
+    with get_session() as session:
+        user = session.get(User, user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        return MeResponse(id=user.id, username=user.username)
+
+
+@router.post("/certificates/register", response_model=CertificateRegisterResponse)
+def register_certificate(
+    payload: CertificateRegisterRequest, user_id: int = Depends(get_current_user_id)
+):
+    with get_session() as session:
+        owner_id = payload.user_id or user_id
+        cert = Certificate(
+            user_id=owner_id,
+            cert_pem=payload.cert_pem,
+            issued_at=datetime.now(timezone.utc).isoformat(),
+            expires_at=(datetime.now(timezone.utc) + timedelta(days=365)).isoformat(),
+            revoked=False,
+        )
+        session.add(cert)
+        session.commit()
+        session.refresh(cert)
+        return CertificateRegisterResponse(cert_id=cert.id)
 
 
 @router.post("/groups", response_model=GroupResponse)

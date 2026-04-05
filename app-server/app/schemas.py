@@ -16,6 +16,20 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
 
 
+class MeResponse(BaseModel):
+    id: int
+    username: str
+
+
+class CertificateRegisterRequest(BaseModel):
+    user_id: int | None = None
+    cert_pem: str
+
+
+class CertificateRegisterResponse(BaseModel):
+    cert_id: int
+
+
 class GroupCreateRequest(BaseModel):
     name: str
 

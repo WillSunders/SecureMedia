@@ -2,14 +2,18 @@ import React, { useEffect, useState } from "react";
 import {
   appServer,
   clearToken,
+  createGroupKeys,
   createGroup,
   createPost,
   fetchHealth,
+  fetchMe,
   getToken,
   getCurrentWrappedKey,
   getWrappedKey,
+  getCaCertificate,
   getPublicKeys,
   loginUser,
+  registerCertificate,
   requestCertificate,
   registerUser,
   setToken,
@@ -48,6 +52,7 @@ export default function App() {
   const [token, setTokenState] = useState(getToken());
   const [userId, setUserId] = useState("");
   const [certStatus, setCertStatus] = useState("");
+  const [caStatus, setCaStatus] = useState("");
   const [groupName, setGroupName] = useState("");
   const [groupId, setGroupId] = useState("");
   const [memberId, setMemberId] = useState("");
@@ -69,6 +74,22 @@ export default function App() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!token) return;
+    fetchMe()
+      .then((me) => setUserId(String(me.id)))
+      .catch(() => {});
+  }, [token]);
+
+  useEffect(() => {
+    getCaCertificate()
+      .then((data) => {
+        localStorage.setItem("ca_cert_pem", data.certificate_pem);
+        setCaStatus("CA certificate loaded.");
+      })
+      .catch(() => setCaStatus("CA certificate unavailable."));
+  }, []);
+
   const handleRegister = async () => {
     setAuthError("");
     setAuthStatus("Registering...");
@@ -77,6 +98,8 @@ export default function App() {
       setToken(data.access_token);
       setTokenState(data.access_token);
       setAuthStatus("Registered and logged in.");
+      const me = await fetchMe();
+      setUserId(String(me.id));
     } catch (err) {
       setAuthError(err.message || "Registration failed");
       setAuthStatus("");
@@ -91,6 +114,8 @@ export default function App() {
       setToken(data.access_token);
       setTokenState(data.access_token);
       setAuthStatus("Logged in.");
+      const me = await fetchMe();
+      setUserId(String(me.id));
     } catch (err) {
       setAuthError(err.message || "Login failed");
       setAuthStatus("");
@@ -120,6 +145,8 @@ export default function App() {
         agreement_public_key_pem: agreementPub
       });
       localStorage.setItem("cert_pem", cert.cert_pem);
+      const appCert = await registerCertificate(cert.cert_pem, Number(userId));
+      localStorage.setItem("app_cert_id", String(appCert.cert_id));
       setCertStatus("Keys registered and certificate issued.");
     } catch (err) {
       setCertStatus(err.message || "Key registration failed");
@@ -131,6 +158,7 @@ export default function App() {
     try {
       const group = await createGroup(groupName);
       setGroupId(String(group.id));
+      await createGroupKeys(String(group.id), [String(userId)]);
       setFlowStatus(`Group created (#${group.id}).`);
     } catch (err) {
       setFlowStatus(err.message || "Create group failed");
@@ -169,7 +197,8 @@ export default function App() {
         auth_tag: ""
       });
       const signature = await signMessage(signingPriv, payloadToSign);
-      const certId = Number(document.getElementById("cert-id")?.value || 1);
+      const storedCertId = localStorage.getItem("app_cert_id");
+      const certId = Number(storedCertId || 1);
       await createPost(groupId, {
         ciphertext: encrypted.ciphertext,
         nonce: encrypted.iv,
@@ -293,6 +322,7 @@ export default function App() {
             <button type="button" onClick={handleKeyRegistration}>
               Generate keys + request certificate
             </button>
+            <div className="status">{caStatus}</div>
             <div className="status">{certStatus}</div>
           </div>
         </section>
@@ -344,7 +374,6 @@ export default function App() {
               onChange={(e) => setGroupId(e.target.value)}
               placeholder="Group ID"
             />
-            <input id="cert-id" placeholder="Cert ID (app server)" />
             <textarea
               rows="3"
               value={postText}
