@@ -201,6 +201,7 @@ Removed users cannot decrypt future posts.
 │   └── src/
 │       ├── api.js
 │       ├── App.jsx
+│       ├── crypto.js
 │       ├── styles.css
 │       └── data/
 │           └── fakeData.js
@@ -253,6 +254,7 @@ Health checks:
 - Key server persistence (Postgres) + CA cert endpoint: Done
 - Frontend app-server connectivity (health check): Done
 - Frontend base page + fake data: Done
+- Client-side crypto utilities (WebCrypto): Done
 - Crypto operations: Not started
 - Database schema/migrations: Not started
 - Auth + API endpoints: Not started
