@@ -198,7 +198,11 @@ Removed users cannot decrypt future posts.
 │   ├── package.json
 │   ├── vite.config.js
 │   └── src/
+│       ├── api.js
 │       ├── App.jsx
+│       ├── styles.css
+│       └── data/
+│           └── fakeData.js
 │       └── main.jsx
 ├── app-server/
 │   ├── Dockerfile
@@ -237,6 +241,8 @@ Health checks:
 - File organisation: Done
 - Docker Compose + Dockerfiles: Done
 - Service skeletons: Done
+- Frontend app-server connectivity (health check): Done
+- Frontend base page + fake data: Done
 - Crypto operations: Not started
 - Database schema/migrations: Not started
 - Auth + API endpoints: Not started
