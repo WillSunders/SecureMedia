@@ -213,7 +213,11 @@ Removed users cannot decrypt future posts.
     ├── Dockerfile
     ├── requirements.txt
     └── app/
-        └── main.py
+        ├── main.py
+        ├── routes.py
+        ├── schemas.py
+        ├── storage.py
+        └── crypto.py
 ```
 
 ---
@@ -241,6 +245,8 @@ Health checks:
 - File organisation: Done
 - Docker Compose + Dockerfiles: Done
 - Service skeletons: Done
+- Key server API skeleton: Done
+- Key server crypto (ECDH + HKDF + AES-GCM, X.509 via cryptography): Done
 - Frontend app-server connectivity (health check): Done
 - Frontend base page + fake data: Done
 - Crypto operations: Not started
