@@ -210,9 +210,12 @@ Removed users cannot decrypt future posts.
 │   ├── Dockerfile
 │   ├── requirements.txt
 │   └── app/
+│       ├── auth.py
 │       ├── db.py
 │       ├── main.py
 │       └── models.py
+│       ├── routes.py
+│       └── schemas.py
 └── key-server/
     ├── Dockerfile
     ├── requirements.txt
@@ -252,6 +255,7 @@ Health checks:
 - Docker Compose + Dockerfiles: Done
 - Service skeletons: Done
 - App server database models: Done
+- App server auth, groups, posts endpoints: Done
 - Key server API skeleton: Done
 - Key server crypto (ECDH + HKDF + AES-GCM, X.509 via cryptography): Done
 - Key server persistence (Postgres) + CA cert endpoint: Done
