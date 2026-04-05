@@ -1,0 +1,54 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: securemedia
+      POSTGRES_USER: securemedia
+      POSTGRES_PASSWORD: securemedia
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  app-server:
+    build:
+      context: ./app-server
+    environment:
+      DATABASE_URL: postgresql+psycopg://securemedia:securemedia@postgres:5432/securemedia
+      KEY_SERVER_URL: http://key-server:8001
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./app-server:/app
+    depends_on:
+      - postgres
+      - key-server
+
+  key-server:
+    build:
+      context: ./key-server
+    environment:
+      DATABASE_URL: postgresql+psycopg://securemedia:securemedia@postgres:5432/securemedia
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./key-server:/app
+    depends_on:
+      - postgres
+
+  frontend:
+    build:
+      context: ./frontend
+    environment:
+      VITE_APP_SERVER_URL: http://localhost:8000
+      VITE_KEY_SERVER_URL: http://localhost:8001
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - app-server
+
+volumes:
+  pgdata:
