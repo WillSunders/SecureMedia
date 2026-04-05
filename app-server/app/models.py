@@ -7,7 +7,7 @@ class Base(DeclarativeBase):
 
 
 class User(Base):
-    __tablename__ = "users"
+    __tablename__ = "app_users"
 
     id = Column(Integer, primary_key=True)
     username = Column(String, unique=True, nullable=False)
@@ -20,10 +20,10 @@ class User(Base):
 
 
 class Certificate(Base):
-    __tablename__ = "certificates"
+    __tablename__ = "app_certificates"
 
     id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("app_users.id"), nullable=False)
     cert_pem = Column(Text, nullable=False)
     issued_at = Column(String, nullable=False)
     expires_at = Column(String, nullable=False)
@@ -33,11 +33,11 @@ class Certificate(Base):
 
 
 class Group(Base):
-    __tablename__ = "groups"
+    __tablename__ = "app_groups"
 
     id = Column(Integer, primary_key=True)
     name = Column(String, nullable=False)
-    owner_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    owner_id = Column(Integer, ForeignKey("app_users.id"), nullable=False)
 
     memberships = relationship("Membership", back_populates="group")
     posts = relationship("Post", back_populates="group")
@@ -45,11 +45,11 @@ class Group(Base):
 
 
 class Membership(Base):
-    __tablename__ = "memberships"
+    __tablename__ = "app_memberships"
 
     id = Column(Integer, primary_key=True)
-    group_id = Column(Integer, ForeignKey("groups.id"), nullable=False)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    group_id = Column(Integer, ForeignKey("app_groups.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("app_users.id"), nullable=False)
     role = Column(String, default="member", nullable=False)
     active = Column(Boolean, default=True, nullable=False)
 
@@ -58,10 +58,10 @@ class Membership(Base):
 
 
 class GroupKeyVersion(Base):
-    __tablename__ = "group_key_versions"
+    __tablename__ = "app_group_key_versions"
 
     id = Column(Integer, primary_key=True)
-    group_id = Column(Integer, ForeignKey("groups.id"), nullable=False)
+    group_id = Column(Integer, ForeignKey("app_groups.id"), nullable=False)
     version_number = Column(Integer, nullable=False)
 
     group = relationship("Group", back_populates="key_versions")
@@ -69,11 +69,11 @@ class GroupKeyVersion(Base):
 
 
 class WrappedKey(Base):
-    __tablename__ = "wrapped_keys"
+    __tablename__ = "app_wrapped_keys"
 
     id = Column(Integer, primary_key=True)
-    group_key_version_id = Column(Integer, ForeignKey("group_key_versions.id"), nullable=False)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    group_key_version_id = Column(Integer, ForeignKey("app_group_key_versions.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("app_users.id"), nullable=False)
     encrypted_key = Column(Text, nullable=False)
 
     group_key_version = relationship("GroupKeyVersion", back_populates="wrapped_keys")
@@ -81,16 +81,16 @@ class WrappedKey(Base):
 
 
 class Post(Base):
-    __tablename__ = "posts"
+    __tablename__ = "app_posts"
 
     id = Column(Integer, primary_key=True)
-    group_id = Column(Integer, ForeignKey("groups.id"), nullable=False)
-    author_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    group_id = Column(Integer, ForeignKey("app_groups.id"), nullable=False)
+    author_id = Column(Integer, ForeignKey("app_users.id"), nullable=False)
     ciphertext = Column(LargeBinary, nullable=False)
     nonce = Column(LargeBinary, nullable=False)
     auth_tag = Column(LargeBinary, nullable=False)
     signature = Column(LargeBinary, nullable=False)
-    cert_id = Column(Integer, ForeignKey("certificates.id"), nullable=False)
+    cert_id = Column(Integer, ForeignKey("app_certificates.id"), nullable=False)
     key_version = Column(Integer, nullable=False)
 
     group = relationship("Group", back_populates="posts")
