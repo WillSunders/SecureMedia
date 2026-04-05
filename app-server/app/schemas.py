@@ -35,14 +35,23 @@ class GroupCreateRequest(BaseModel):
 
 
 class GroupMemberAddRequest(BaseModel):
-    user_id: int
+    user_id: int | None = None
+    username: str | None = None
 
 
 class GroupResponse(BaseModel):
     id: int
     name: str
     owner_id: int
+    owner_username: str | None = None
     members: list[int]
+
+
+class GroupListResponse(BaseModel):
+    id: int
+    name: str
+    owner_id: int
+    owner_username: str | None = None
 
 
 class PostCreateRequest(BaseModel):

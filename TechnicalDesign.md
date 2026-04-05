@@ -172,11 +172,16 @@ Removed users cannot decrypt future posts.
 - POST /auth/login
 - GET /auth/me
 - POST /groups
+- GET /groups
 - GET /groups/:id
+- GET /groups/by-name/:name
 - POST /groups/:id/members
+- POST /groups/by-name/:name/members
 - DELETE /groups/:id/members/:userId
 - POST /groups/:id/posts
+- POST /groups/by-name/:name/posts
 - GET /groups/:id/posts
+- GET /posts
 - POST /certificates/register
 
 ### Key Server

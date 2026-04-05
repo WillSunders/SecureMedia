@@ -92,6 +92,32 @@ export async function addMember(groupId, userId) {
   return res.json();
 }
 
+export async function addMemberByName(groupName, username) {
+  const res = await fetch(`${appServer}/groups/by-name/${groupName}/members`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ username })
+  });
+  if (!res.ok) throw new Error("Add member failed");
+  return res.json();
+}
+
+export async function getGroupByName(groupName) {
+  const res = await fetch(`${appServer}/groups/by-name/${groupName}`, {
+    headers: { ...authHeaders() }
+  });
+  if (!res.ok) throw new Error("Get group failed");
+  return res.json();
+}
+
+export async function listMyGroups() {
+  const res = await fetch(`${appServer}/groups`, {
+    headers: { ...authHeaders() }
+  });
+  if (!res.ok) throw new Error("Fetch groups failed");
+  return res.json();
+}
+
 export async function createPost(groupId, payload) {
   const res = await fetch(`${appServer}/groups/${groupId}/posts`, {
     method: "POST",
@@ -102,8 +128,26 @@ export async function createPost(groupId, payload) {
   return res.json();
 }
 
+export async function createPostByName(groupName, payload) {
+  const res = await fetch(`${appServer}/groups/by-name/${groupName}/posts`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) throw new Error("Create post failed");
+  return res.json();
+}
+
 export async function listPosts(groupId) {
   const res = await fetch(`${appServer}/groups/${groupId}/posts`, {
+    headers: { ...authHeaders() }
+  });
+  if (!res.ok) throw new Error("Fetch posts failed");
+  return res.json();
+}
+
+export async function listAllPosts() {
+  const res = await fetch(`${appServer}/posts`, {
     headers: { ...authHeaders() }
   });
   if (!res.ok) throw new Error("Fetch posts failed");

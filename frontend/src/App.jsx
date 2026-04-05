@@ -3,20 +3,23 @@ import {
   clearToken,
   createGroupKeys,
   createGroup,
-  createPost,
+  createPostByName,
   fetchMe,
   getToken,
   getCurrentWrappedKey,
   getWrappedKey,
   getCaCertificate,
   getPublicKeys,
+  getGroupByName,
+  listMyGroups,
   loginUser,
   registerCertificate,
   requestCertificate,
   registerUser,
   setToken,
-  addMember,
-  listPosts
+  addMemberByName,
+  listPosts,
+  listAllPosts
 } from "./api.js";
 import {
   decryptPost,
@@ -41,11 +44,12 @@ export default function App() {
   const [certStatus, setCertStatus] = useState("");
   const [caStatus, setCaStatus] = useState("");
   const [groupName, setGroupName] = useState("");
-  const [groupId, setGroupId] = useState("");
-  const [memberId, setMemberId] = useState("");
+  const [postGroupName, setPostGroupName] = useState("");
+  const [memberName, setMemberName] = useState("");
   const [postText, setPostText] = useState("");
   const [feedData, setFeedData] = useState([]);
   const [flowStatus, setFlowStatus] = useState("");
+  const [myGroups, setMyGroups] = useState([]);
   const [me, setMe] = useState({ id: "", username: "" });
 
   useEffect(() => {
@@ -68,9 +72,29 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!groupId) return;
+    if (!token) return;
     handleFetchPosts();
-  }, [groupId]);
+    const interval = setInterval(() => {
+      handleFetchPosts();
+    }, 8000);
+    return () => clearInterval(interval);
+  }, [token]);
+
+  useEffect(() => {
+    if (!token) return;
+    if (!postGroupName) return;
+    handleFetchPosts();
+  }, [postGroupName, token]);
+
+  const refreshGroups = async () => {
+    if (!token) return;
+    try {
+      const groups = await listMyGroups();
+      setMyGroups(groups);
+    } catch {
+      setMyGroups([]);
+    }
+  };
 
   const handleRegister = async () => {
     setAuthError("");
@@ -83,6 +107,8 @@ export default function App() {
       const dataMe = await fetchMe();
       setUserId(String(dataMe.id));
       setMe({ id: String(dataMe.id), username: dataMe.username });
+      await refreshGroups();
+      await handleFetchPosts();
     } catch (err) {
       setAuthError(err.message || "Registration failed");
       setAuthStatus("");
@@ -100,6 +126,8 @@ export default function App() {
       const dataMe = await fetchMe();
       setUserId(String(dataMe.id));
       setMe({ id: String(dataMe.id), username: dataMe.username });
+      await refreshGroups();
+      await handleFetchPosts();
     } catch (err) {
       setAuthError(err.message || "Login failed");
       setAuthStatus("");
@@ -109,7 +137,13 @@ export default function App() {
   const handleLogout = () => {
     clearToken();
     setTokenState(null);
+    setUsername("");
+    setPassword("");
+    setUserId("");
+    setMe({ id: "", username: "" });
     setAuthStatus("Logged out.");
+    setFeedData([]);
+    setMyGroups([]);
   };
 
   const handleKeyRegistration = async () => {
@@ -144,9 +178,10 @@ export default function App() {
       const hasAgreement = localStorage.getItem("agreement_private_pem");
       if (!hasAgreement) throw new Error("Generate keys + request certificate first");
       const group = await createGroup(groupName);
-      setGroupId(String(group.id));
       await createGroupKeys(String(group.id), [String(userId)]);
       setFlowStatus(`Group created (#${group.id}).`);
+      await refreshGroups();
+      await handleFetchPosts();
     } catch (err) {
       setFlowStatus(err.message || "Create group failed");
     }
@@ -155,8 +190,10 @@ export default function App() {
   const handleAddMember = async () => {
     setFlowStatus("Adding member...");
     try {
-      await addMember(groupId, memberId);
+      await addMemberByName(groupName, memberName);
       setFlowStatus("Member added.");
+      await refreshGroups();
+      await handleFetchPosts();
     } catch (err) {
       setFlowStatus(err.message || "Add member failed");
     }
@@ -165,16 +202,21 @@ export default function App() {
   const handlePost = async () => {
     setFlowStatus("Encrypting and posting...");
     try {
-      const wrapped = await getCurrentWrappedKey(groupId, userId);
+      const group = await getGroupByName(postGroupName);
+      const wrapped = await getCurrentWrappedKey(group.id, userId);
       const agreementPrivPem = localStorage.getItem("agreement_private_pem");
       if (!agreementPrivPem) throw new Error("Missing agreement private key");
-      const context = `${groupId}:${wrapped.version}:${userId}`;
+      const context = `${group.id}:${wrapped.version}:${userId}`;
       const groupKey = await unwrapGroupKey(
         wrapped.wrapped_key,
         agreementPrivPem,
         context
       );
-      const encrypted = await encryptPost(groupKey, postText, `group:${groupId}`);
+      const encrypted = await encryptPost(
+        groupKey,
+        postText,
+        `group:${group.id}`
+      );
       const signingPrivPem = localStorage.getItem("signing_private_pem");
       if (!signingPrivPem) throw new Error("Missing signing private key");
       const signingPriv = await importPrivateKeyPem(signingPrivPem, "sign");
@@ -186,7 +228,7 @@ export default function App() {
       const signature = await signMessage(signingPriv, payloadToSign);
       const storedCertId = localStorage.getItem("app_cert_id");
       const certId = Number(storedCertId || 1);
-      await createPost(groupId, {
+      await createPostByName(postGroupName, {
         ciphertext: encrypted.ciphertext,
         nonce: encrypted.iv,
         auth_tag: "",
@@ -202,10 +244,9 @@ export default function App() {
   };
 
   const handleFetchPosts = async () => {
-    if (!groupId) return;
     setFlowStatus("Fetching posts...");
     try {
-      const posts = await listPosts(groupId);
+      const posts = await listAllPosts();
       const agreementPrivPem = localStorage.getItem("agreement_private_pem");
       const decrypted = [];
       for (const post of posts) {
@@ -213,8 +254,12 @@ export default function App() {
         let verified = false;
         try {
           if (agreementPrivPem) {
-            const wrapped = await getWrappedKey(groupId, post.key_version, userId);
-            const context = `${groupId}:${wrapped.version}:${userId}`;
+            const wrapped = await getWrappedKey(
+              post.group_id,
+              post.key_version,
+              userId
+            );
+            const context = `${post.group_id}:${wrapped.version}:${userId}`;
             const groupKey = await unwrapGroupKey(
               wrapped.wrapped_key,
               agreementPrivPem,
@@ -224,7 +269,7 @@ export default function App() {
               groupKey,
               post.nonce,
               post.ciphertext,
-              `group:${groupId}`
+              `group:${post.group_id}`
             );
           }
         } catch {
@@ -260,8 +305,9 @@ export default function App() {
         <section className="hero">
           <h1>Encrypted groups, visible momentum.</h1>
           <p>
-            {me.username ? `${me.username}` : "Anonymous"}{" "}
-            {me.username ? `@${me.username}` : ""} · Active
+            {token && me.username
+              ? `${me.username} @${me.username} · Active`
+              : "Not logged in"}
           </p>
           <div className="auth">
             <input
@@ -292,9 +338,9 @@ export default function App() {
               {authError || authStatus || (token ? "Authenticated" : "Not logged in")}
             </div>
             <input
-              value={userId}
-              onChange={(e) => setUserId(e.target.value)}
-              placeholder="User ID (numeric)"
+              value={me.username ? `@${me.username}` : ""}
+              readOnly
+              placeholder="@username"
             />
             <button type="button" onClick={handleKeyRegistration}>
               Generate keys + request certificate
@@ -316,18 +362,39 @@ export default function App() {
               Create group
             </button>
             <input
-              value={groupId}
-              onChange={(e) => setGroupId(e.target.value)}
-              placeholder="Group ID"
-            />
-            <input
-              value={memberId}
-              onChange={(e) => setMemberId(e.target.value)}
-              placeholder="Member user ID"
+              value={memberName}
+              onChange={(e) => setMemberName(e.target.value)}
+              placeholder="Member username"
             />
             <button type="button" onClick={handleAddMember}>
               Add member
             </button>
+          </div>
+        </section>
+
+        <section className="card">
+          <h3>Your groups</h3>
+          <div className="auth">
+            <div className="feed">
+              {myGroups.map((group) => (
+                <article key={group.id} className="card">
+                  <div className="card-header">
+                    <div className="user">
+                      <div className="avatar" />
+                      <div>
+                        <h3>{group.name}</h3>
+                        <span>
+                          Owner{" "}
+                          {group.owner_username
+                            ? `@${group.owner_username}`
+                            : `#${group.owner_id}`}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
           </div>
         </section>
 
@@ -342,11 +409,11 @@ export default function App() {
             onChange={(e) => setPostText(e.target.value)}
             placeholder="Share an update with your group..."
           />
-          <div className="actions">
+            <div className="actions">
             <input
-              value={groupId}
-              onChange={(e) => setGroupId(e.target.value)}
-              placeholder="Group ID"
+              value={postGroupName}
+              onChange={(e) => setPostGroupName(e.target.value)}
+              placeholder="Group name (for posting)"
             />
             <button type="button" className="new-post" onClick={handlePost}>
               Send
@@ -365,8 +432,7 @@ export default function App() {
                     <span>
                       {post.author_username
                         ? `@${post.author_username}`
-                        : `@user${post.author_id}`}{" "}
-                      · Key v{post.key_version}
+                        : `@user${post.author_id}`}
                     </span>
                   </div>
                 </div>
