@@ -1,5 +1,5 @@
 fastapi==0.115.0
-passlib[bcrypt]==1.7.4
+passlib==1.7.4
 pyjwt==2.9.0
 psycopg[binary]==3.2.1
 sqlalchemy==2.0.32
