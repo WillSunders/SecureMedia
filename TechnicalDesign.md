@@ -205,8 +205,6 @@ Removed users cannot decrypt future posts.
 │       ├── App.jsx
 │       ├── crypto.js
 │       ├── styles.css
-│       └── data/
-│           └── fakeData.js
 │       └── main.jsx
 ├── app-server/
 │   ├── Dockerfile

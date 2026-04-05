@@ -226,6 +226,7 @@ def list_posts(group_id: int, user_id: int = Depends(get_current_user_id)):
                 id=post.id,
                 group_id=post.group_id,
                 author_id=post.author_id,
+                author_username=(session.get(User, post.author_id).username if session.get(User, post.author_id) else None),
                 ciphertext=_b64(post.ciphertext),
                 nonce=_b64(post.nonce),
                 auth_tag=_b64(post.auth_tag),

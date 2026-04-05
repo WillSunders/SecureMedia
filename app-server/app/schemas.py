@@ -58,6 +58,7 @@ class PostResponse(BaseModel):
     id: int
     group_id: int
     author_id: int
+    author_username: str | None = None
     ciphertext: str
     nonce: str
     auth_tag: str

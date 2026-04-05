@@ -18,7 +18,6 @@ import {
   addMember,
   listPosts
 } from "./api.js";
-import { currentUser, feed } from "./data/fakeData.js";
 import {
   decryptPost,
   encryptPost,
@@ -47,11 +46,15 @@ export default function App() {
   const [postText, setPostText] = useState("");
   const [feedData, setFeedData] = useState([]);
   const [flowStatus, setFlowStatus] = useState("");
+  const [me, setMe] = useState({ id: "", username: "" });
 
   useEffect(() => {
     if (!token) return;
     fetchMe()
-      .then((me) => setUserId(String(me.id)))
+      .then((data) => {
+        setUserId(String(data.id));
+        setMe({ id: String(data.id), username: data.username });
+      })
       .catch(() => {});
   }, [token]);
 
@@ -77,8 +80,9 @@ export default function App() {
       setToken(data.access_token);
       setTokenState(data.access_token);
       setAuthStatus("Registered and logged in.");
-      const me = await fetchMe();
-      setUserId(String(me.id));
+      const dataMe = await fetchMe();
+      setUserId(String(dataMe.id));
+      setMe({ id: String(dataMe.id), username: dataMe.username });
     } catch (err) {
       setAuthError(err.message || "Registration failed");
       setAuthStatus("");
@@ -93,8 +97,9 @@ export default function App() {
       setToken(data.access_token);
       setTokenState(data.access_token);
       setAuthStatus("Logged in.");
-      const me = await fetchMe();
-      setUserId(String(me.id));
+      const dataMe = await fetchMe();
+      setUserId(String(dataMe.id));
+      setMe({ id: String(dataMe.id), username: dataMe.username });
     } catch (err) {
       setAuthError(err.message || "Login failed");
       setAuthStatus("");
@@ -255,7 +260,8 @@ export default function App() {
         <section className="hero">
           <h1>Encrypted groups, visible momentum.</h1>
           <p>
-            {currentUser.name} {currentUser.handle} · {currentUser.status}
+            {me.username ? `${me.username}` : "Anonymous"}{" "}
+            {me.username ? `@${me.username}` : ""} · Active
           </p>
           <div className="auth">
             <input
@@ -349,40 +355,28 @@ export default function App() {
           <div className="status">{flowStatus}</div>
         </section>
         <section className="feed">
-          {feedData.length > 0
-            ? feedData.map((post) => (
-                <article key={post.id} className="card">
-                  <div className="card-header">
-                    <div className="user">
-                      <div className="avatar" />
-                      <div>
-                        <h3>User {post.author_id}</h3>
-                        <span>Key v{post.key_version}</span>
-                      </div>
-                    </div>
-                    <span className="pill">
-                      {post.verified ? "Verified" : "Encrypted"}
+          {feedData.map((post) => (
+            <article key={post.id} className="card">
+              <div className="card-header">
+                <div className="user">
+                  <div className="avatar" />
+                  <div>
+                    <h3>{post.author_username || `User ${post.author_id}`}</h3>
+                    <span>
+                      {post.author_username
+                        ? `@${post.author_username}`
+                        : `@user${post.author_id}`}{" "}
+                      · Key v{post.key_version}
                     </span>
                   </div>
-                  <p>{post.plaintext || post.ciphertext}</p>
-                </article>
-              ))
-            : feed.map((post) => (
-                <article key={post.id} className="card">
-                  <div className="card-header">
-                    <div className="user">
-                      <div className="avatar" />
-                      <div>
-                        <h3>{post.name}</h3>
-                        <span>
-                          {post.handle} · {post.time}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                  <p>{post.content}</p>
-                </article>
-              ))}
+                </div>
+                <span className="pill">
+                  {post.verified ? "Verified" : "Encrypted"}
+                </span>
+              </div>
+              <p>{post.plaintext || post.ciphertext}</p>
+            </article>
+          ))}
         </section>
       </section>
     </div>
