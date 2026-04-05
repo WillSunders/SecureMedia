@@ -64,6 +64,11 @@ export default function App() {
       .catch(() => setCaStatus("CA certificate unavailable."));
   }, []);
 
+  useEffect(() => {
+    if (!groupId) return;
+    handleFetchPosts();
+  }, [groupId]);
+
   const handleRegister = async () => {
     setAuthError("");
     setAuthStatus("Registering...");
@@ -182,33 +187,41 @@ export default function App() {
         key_version: wrapped.version
       });
       setFlowStatus("Post sent.");
+      await handleFetchPosts();
     } catch (err) {
       setFlowStatus(err.message || "Post failed");
     }
   };
 
   const handleFetchPosts = async () => {
+    if (!groupId) return;
     setFlowStatus("Fetching posts...");
     try {
       const posts = await listPosts(groupId);
       const agreementPrivPem = localStorage.getItem("agreement_private_pem");
-      if (!agreementPrivPem) throw new Error("Missing agreement private key");
       const decrypted = [];
       for (const post of posts) {
-        const wrapped = await getWrappedKey(groupId, post.key_version, userId);
-        const context = `${groupId}:${wrapped.version}:${userId}`;
-        const groupKey = await unwrapGroupKey(
-          wrapped.wrapped_key,
-          agreementPrivPem,
-          context
-        );
-        const plaintext = await decryptPost(
-          groupKey,
-          post.nonce,
-          post.ciphertext,
-          `group:${groupId}`
-        );
+        let plaintext = null;
         let verified = false;
+        try {
+          if (agreementPrivPem) {
+            const wrapped = await getWrappedKey(groupId, post.key_version, userId);
+            const context = `${groupId}:${wrapped.version}:${userId}`;
+            const groupKey = await unwrapGroupKey(
+              wrapped.wrapped_key,
+              agreementPrivPem,
+              context
+            );
+            plaintext = await decryptPost(
+              groupKey,
+              post.nonce,
+              post.ciphertext,
+              `group:${groupId}`
+            );
+          }
+        } catch {
+          plaintext = null;
+        }
         try {
           const keys = await getPublicKeys(String(post.author_id));
           const pubKey = await importPublicKeyPem(
@@ -282,18 +295,6 @@ export default function App() {
           </div>
         </section>
 
-        <section className="compose">
-          <div className="avatar" />
-          <textarea
-            rows="3"
-            placeholder="Share an update with your group..."
-          />
-          <div className="actions">
-            <span className="tag">Group: Core Team</span>
-            <button className="new-post">Send</button>
-          </div>
-        </section>
-
         <section className="card">
           <h3>Create group</h3>
           <div className="auth">
@@ -321,80 +322,64 @@ export default function App() {
           </div>
         </section>
 
-        <section className="card">
-          <h3>Post encrypted message</h3>
-          <div className="auth">
-            <input
-              value={groupId}
-              onChange={(e) => setGroupId(e.target.value)}
-              placeholder="Group ID"
-            />
-            <textarea
-              rows="3"
-              value={postText}
-              onChange={(e) => setPostText(e.target.value)}
-              placeholder="Message"
-            />
-            <button type="button" onClick={handlePost}>
-              Encrypt + send
-            </button>
-          </div>
-        </section>
-
-        <section className="card">
-          <h3>Read posts</h3>
-          <div className="auth">
-            <input
-              value={groupId}
-              onChange={(e) => setGroupId(e.target.value)}
-              placeholder="Group ID"
-            />
-            <button type="button" onClick={handleFetchPosts}>
-              Fetch + decrypt
-            </button>
-            <div className="status">{flowStatus}</div>
-          </div>
-          <div className="feed">
-            {feedData.map((post) => (
-              <article key={post.id} className="card">
-                <div className="card-header">
-                  <div className="user">
-                    <div className="avatar" />
-                    <div>
-                      <h3>User {post.author_id}</h3>
-                      <span>Key v{post.key_version}</span>
-                    </div>
-                  </div>
-                  <span className="pill">
-                    {post.verified ? "Verified" : "Unverified"}
-                  </span>
-                </div>
-                <p>{post.plaintext}</p>
-              </article>
-            ))}
-          </div>
-        </section>
-
       </section>
 
       <section className="right feed-pane">
+        <section className="compose">
+          <div className="avatar" />
+          <textarea
+            rows="3"
+            value={postText}
+            onChange={(e) => setPostText(e.target.value)}
+            placeholder="Share an update with your group..."
+          />
+          <div className="actions">
+            <input
+              value={groupId}
+              onChange={(e) => setGroupId(e.target.value)}
+              placeholder="Group ID"
+            />
+            <button type="button" className="new-post" onClick={handlePost}>
+              Send
+            </button>
+          </div>
+          <div className="status">{flowStatus}</div>
+        </section>
         <section className="feed">
-          {feed.map((post) => (
-            <article key={post.id} className="card">
-              <div className="card-header">
-                <div className="user">
-                  <div className="avatar" />
-                  <div>
-                    <h3>{post.name}</h3>
-                    <span>
-                      {post.handle} · {post.time}
+          {feedData.length > 0
+            ? feedData.map((post) => (
+                <article key={post.id} className="card">
+                  <div className="card-header">
+                    <div className="user">
+                      <div className="avatar" />
+                      <div>
+                        <h3>User {post.author_id}</h3>
+                        <span>Key v{post.key_version}</span>
+                      </div>
+                    </div>
+                    <span className="pill">
+                      {post.verified ? "Verified" : "Encrypted"}
                     </span>
                   </div>
-                </div>
-              </div>
-              <p>{post.content}</p>
-            </article>
-          ))}
+                  <p>{post.plaintext || post.ciphertext}</p>
+                </article>
+              ))
+            : feed.map((post) => (
+                <article key={post.id} className="card">
+                  <div className="card-header">
+                    <div className="user">
+                      <div className="avatar" />
+                      <div>
+                        <h3>{post.name}</h3>
+                        <span>
+                          {post.handle} · {post.time}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <p>{post.content}</p>
+                </article>
+              ))}
         </section>
       </section>
     </div>

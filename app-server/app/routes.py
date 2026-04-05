@@ -220,15 +220,6 @@ def create_post(
 @router.get("/groups/{group_id}/posts", response_model=list[PostResponse])
 def list_posts(group_id: int, user_id: int = Depends(get_current_user_id)):
     with get_session() as session:
-        membership = session.scalar(
-            select(Membership).where(
-                Membership.group_id == group_id,
-                Membership.user_id == user_id,
-                Membership.active == True,
-            )
-        )
-        if not membership:
-            raise HTTPException(status_code=403, detail="Not a member")
         posts = session.scalars(select(Post).where(Post.group_id == group_id)).all()
         return [
             PostResponse(
