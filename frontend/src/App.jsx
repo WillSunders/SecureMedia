@@ -1,11 +1,9 @@
 import React, { useEffect, useState } from "react";
 import {
-  appServer,
   clearToken,
   createGroupKeys,
   createGroup,
   createPost,
-  fetchHealth,
   fetchMe,
   getToken,
   getCurrentWrappedKey,
@@ -20,13 +18,7 @@ import {
   addMember,
   listPosts
 } from "./api.js";
-import {
-  currentUser,
-  feed,
-  navItems,
-  suggestions,
-  trends
-} from "./data/fakeData.js";
+import { currentUser, feed } from "./data/fakeData.js";
 import {
   decryptPost,
   encryptPost,
@@ -40,11 +32,7 @@ import {
   verifyMessage
 } from "./crypto.js";
 
-const keyServer = import.meta.env.VITE_KEY_SERVER_URL || "http://localhost:8001";
-
 export default function App() {
-  const [health, setHealth] = useState({ status: "loading" });
-  const [error, setError] = useState("");
   const [authError, setAuthError] = useState("");
   const [authStatus, setAuthStatus] = useState("");
   const [username, setUsername] = useState("");
@@ -59,20 +47,6 @@ export default function App() {
   const [postText, setPostText] = useState("");
   const [feedData, setFeedData] = useState([]);
   const [flowStatus, setFlowStatus] = useState("");
-
-  useEffect(() => {
-    let cancelled = false;
-    fetchHealth()
-      .then((data) => {
-        if (!cancelled) setHealth(data);
-      })
-      .catch((err) => {
-        if (!cancelled) setError(err.message || "Health check failed");
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   useEffect(() => {
     if (!token) return;
@@ -260,27 +234,8 @@ export default function App() {
   };
 
   return (
-    <div className="app">
-      <aside className="sidebar">
-        <div className="brand">
-          <div className="logo" />
-          SecureMedia
-        </div>
-        <nav className="nav">
-          {navItems.map((item) => (
-            <a
-              key={item.label}
-              className={item.active ? "active" : ""}
-              href="#"
-            >
-              {item.label}
-            </a>
-          ))}
-        </nav>
-        <button className="new-post">New encrypted post</button>
-      </aside>
-
-      <main className="main">
+    <div className="app split">
+      <section className="left">
         <section className="hero">
           <h1>Encrypted groups, visible momentum.</h1>
           <p>
@@ -420,6 +375,9 @@ export default function App() {
           </div>
         </section>
 
+      </section>
+
+      <section className="right feed-pane">
         <section className="feed">
           {feed.map((post) => (
             <article key={post.id} className="card">
@@ -433,59 +391,12 @@ export default function App() {
                     </span>
                   </div>
                 </div>
-                <span className="pill">Verified</span>
               </div>
               <p>{post.content}</p>
-              <div className="meta">
-                <span>{post.tags.join(" ")}</span>
-                <span>{post.stats.replies} replies</span>
-                <span>{post.stats.reposts} reposts</span>
-                <span>{post.stats.likes} likes</span>
-              </div>
             </article>
           ))}
         </section>
-      </main>
-
-      <aside className="right">
-        <div className="panel">
-          <h4>System status</h4>
-          <ul>
-            <li>
-              App Server <span className="pill">{appServer}</span>
-            </li>
-            <li>
-              Key Server <span className="pill">{keyServer}</span>
-            </li>
-            <li>
-              Health{" "}
-              <span className="pill">
-                {error ? "error" : health?.status || "unknown"}
-              </span>
-            </li>
-          </ul>
-        </div>
-        <div className="panel">
-          <h4>Trending</h4>
-          <ul>
-            {trends.map((trend) => (
-              <li key={trend.topic}>
-                {trend.topic} <span className="pill">{trend.count}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-        <div className="panel">
-          <h4>Suggested groups</h4>
-          <ul>
-            {suggestions.map((group) => (
-              <li key={group.name}>
-                {group.name} <span className="pill">{group.members}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </aside>
+      </section>
     </div>
   );
 }
