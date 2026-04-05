@@ -180,6 +180,7 @@ Removed users cannot decrypt future posts.
 ### Key Server
 - POST /certificates/request
 - GET /certificates/:userId
+- GET /public-keys/:userId
 - POST /groups/:id/keys/create
 - POST /groups/:id/keys/rotate
 - GET /groups/:id/keys/current
@@ -213,7 +214,9 @@ Removed users cannot decrypt future posts.
     ├── Dockerfile
     ├── requirements.txt
     └── app/
+        ├── db.py
         ├── main.py
+        ├── models.py
         ├── routes.py
         ├── schemas.py
         ├── storage.py
@@ -247,6 +250,7 @@ Health checks:
 - Service skeletons: Done
 - Key server API skeleton: Done
 - Key server crypto (ECDH + HKDF + AES-GCM, X.509 via cryptography): Done
+- Key server persistence (Postgres) + CA cert endpoint: Done
 - Frontend app-server connectivity (health check): Done
 - Frontend base page + fake data: Done
 - Crypto operations: Not started

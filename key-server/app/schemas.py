@@ -30,3 +30,9 @@ class WrappedKeyResponse(BaseModel):
     version: int
     user_id: str
     wrapped_key: str
+
+
+class PublicKeysResponse(BaseModel):
+    user_id: str
+    signing_public_key_pem: str
+    agreement_public_key_pem: str

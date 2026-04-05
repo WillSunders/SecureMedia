@@ -51,6 +51,21 @@ def create_ca() -> CAKeys:
     return CAKeys(private_key=private_key, certificate_pem=cert.public_bytes(serialization.Encoding.PEM).decode("utf-8"))
 
 
+def serialize_private_key(private_key: ec.EllipticCurvePrivateKey) -> str:
+    return private_key.private_bytes(
+        serialization.Encoding.PEM,
+        serialization.PrivateFormat.PKCS8,
+        serialization.NoEncryption(),
+    ).decode("utf-8")
+
+
+def load_private_key(private_key_pem: str) -> ec.EllipticCurvePrivateKey:
+    key = serialization.load_pem_private_key(private_key_pem.encode("utf-8"), password=None)
+    if not isinstance(key, ec.EllipticCurvePrivateKey):
+        raise ValueError("CA private key must be EC")
+    return key
+
+
 def issue_user_certificate(
     ca_private_key: ec.EllipticCurvePrivateKey,
     user_id: str,
