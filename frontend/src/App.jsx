@@ -52,6 +52,7 @@ export default function App() {
   const [feedData, setFeedData] = useState([]);
   const [flowStatus, setFlowStatus] = useState("");
   const [myGroups, setMyGroups] = useState([]);
+  const [groupMap, setGroupMap] = useState({});
   const [me, setMe] = useState({ id: "", username: "" });
 
   useEffect(() => {
@@ -98,9 +99,16 @@ export default function App() {
     try {
       const groups = await listMyGroups();
       setMyGroups(groups);
+      setGroupMap(
+        groups.reduce((acc, group) => {
+          acc[group.id] = group.name;
+          return acc;
+        }, {})
+      );
       return groups;
     } catch {
       setMyGroups([]);
+      setGroupMap({});
       return [];
     }
   };
@@ -360,6 +368,12 @@ export default function App() {
     try {
       const groups = await listMyGroups();
       setMyGroups(groups);
+      setGroupMap(
+        groups.reduce((acc, group) => {
+          acc[group.id] = group.name;
+          return acc;
+        }, {})
+      );
       const groupIds = new Set(groups.map((group) => group.id));
       const posts = (await listAllPosts()).filter(
         (post) => groupIds.size === 0 || groupIds.has(post.group_id)
@@ -452,7 +466,7 @@ export default function App() {
     <div className="app split">
       <section className="left">
         <section className="hero">
-          <h1>Encrypted groups, visible momentum.</h1>
+          <h1>SecureMedia</h1>
           <p>
             {token && me.username
               ? `${me.username} @${me.username} · Active`
@@ -576,8 +590,8 @@ export default function App() {
           </div>
           <div className="status">{flowStatus}</div>
         </section>
-        <section className="feed">
-          {feedData.map((post) => (
+        <section className="feed feed-scroll">
+          {[...feedData].reverse().map((post) => (
             <article key={post.id} className="card">
               <div className="card-header">
                 <div className="user">
@@ -589,12 +603,12 @@ export default function App() {
                         ? `@${post.author_username}`
                         : `@user${post.author_id}`}
                     </span>
+                      </div>
+                    </div>
+                    <span className="pill">
+                      {groupMap[post.group_id] || `Group ${post.group_id}`}
+                    </span>
                   </div>
-                </div>
-                <span className="pill">
-                  {post.verified ? "Verified" : "Encrypted"}
-                </span>
-              </div>
               <p>{post.plaintext || post.ciphertext}</p>
             </article>
           ))}

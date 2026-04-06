@@ -48,6 +48,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  height: 100%;
 }
 
 .brand {
@@ -184,6 +185,12 @@ body {
   gap: 14px;
 }
 
+.feed-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
 .card {
   background: var(--card);
   border-radius: 18px;
@@ -235,6 +242,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 18px;
+  height: calc(100vh - 48px);
 }
 
 .panel {
