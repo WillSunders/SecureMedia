@@ -375,9 +375,7 @@ export default function App() {
         }, {})
       );
       const groupIds = new Set(groups.map((group) => group.id));
-      const posts = (await listAllPosts()).filter(
-        (post) => groupIds.size === 0 || groupIds.has(post.group_id)
-      );
+      const posts = await listAllPosts();
       const agreementPrivPem = localStorage.getItem("agreement_private_pem");
       const repairedGroups = new Set();
       const decrypted = [];
@@ -385,7 +383,7 @@ export default function App() {
         let plaintext = null;
         let verified = false;
         try {
-          if (agreementPrivPem && userId) {
+          if (agreementPrivPem && userId && groupIds.has(post.group_id)) {
             const wrapped = await getWrappedKey(
               post.group_id,
               post.key_version,
