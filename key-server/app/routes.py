@@ -114,16 +114,6 @@ def create_group_keys(group_id: str, payload: GroupKeysCreateRequest):
             session.add(GroupKey(group_id=group_id, version=version, key_bytes=group_key))
         wrapped = {}
         for member_id in payload.member_user_ids:
-            existing = session.scalar(
-                select(WrappedKey.wrapped_key).where(
-                    WrappedKey.group_id == group_id,
-                    WrappedKey.version == version,
-                    WrappedKey.user_id == member_id,
-                )
-            )
-            if existing:
-                wrapped[member_id] = existing
-                continue
             pk = session.get(PublicKeyBundle, member_id)
             if not pk:
                 raise HTTPException(
@@ -131,14 +121,24 @@ def create_group_keys(group_id: str, payload: GroupKeysCreateRequest):
                 )
             context = f"{group_id}:{version}:{member_id}".encode("utf-8")
             wrapped_key = wrap_group_key(group_key, pk.agreement_public_key_pem, context)
-            session.add(
-                WrappedKey(
-                    group_id=group_id,
-                    version=version,
-                    user_id=member_id,
-                    wrapped_key=wrapped_key,
+            existing = session.scalar(
+                select(WrappedKey).where(
+                    WrappedKey.group_id == group_id,
+                    WrappedKey.version == version,
+                    WrappedKey.user_id == member_id,
                 )
             )
+            if existing:
+                existing.wrapped_key = wrapped_key
+            else:
+                session.add(
+                    WrappedKey(
+                        group_id=group_id,
+                        version=version,
+                        user_id=member_id,
+                        wrapped_key=wrapped_key,
+                    )
+                )
             wrapped[member_id] = wrapped_key
         session.commit()
         return GroupKeysCreateResponse(

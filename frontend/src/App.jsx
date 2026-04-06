@@ -98,8 +98,10 @@ export default function App() {
     try {
       const groups = await listMyGroups();
       setMyGroups(groups);
+      return groups;
     } catch {
       setMyGroups([]);
+      return [];
     }
   };
 
@@ -135,7 +137,8 @@ export default function App() {
         setCertStatus("Keys belonged to another user. Regenerating credentials.");
       }
       await handleKeyRegistration(currentUserId, dataMe.username);
-      await refreshGroups();
+      const groups = await refreshGroups();
+      await ensureGroupKeys(groups);
       await handleFetchPosts();
     } catch (err) {
       setAuthError(err.message || "Registration failed");
@@ -175,7 +178,8 @@ export default function App() {
         setCertStatus("Keys belonged to another user. Regenerating credentials.");
       }
       await handleKeyRegistration(currentUserId, dataMe.username);
-      await refreshGroups();
+      const groups = await refreshGroups();
+      await ensureGroupKeys(groups);
       await handleFetchPosts();
     } catch (err) {
       setAuthError(err.message || "Login failed");
@@ -234,6 +238,19 @@ export default function App() {
       await handleFetchPosts();
     } catch (err) {
       setFlowStatus(err.message || "Create group failed");
+    }
+  };
+
+  const ensureGroupKeys = async (groups) => {
+    if (!groups || !groups.length || !userId) return;
+    for (const group of groups) {
+      try {
+        const fullGroup = await getGroup(group.id);
+        const memberIds = fullGroup.members.map((id) => String(id));
+        await createGroupKeys(String(fullGroup.id), memberIds);
+      } catch {
+        // Best effort; if we fail here, fetch/decrypt will retry later.
+      }
     }
   };
 
@@ -341,7 +358,12 @@ export default function App() {
   const handleFetchPosts = async () => {
     setFlowStatus("Fetching posts...");
     try {
-      const posts = await listAllPosts();
+      const groups = await listMyGroups();
+      setMyGroups(groups);
+      const groupIds = new Set(groups.map((group) => group.id));
+      const posts = (await listAllPosts()).filter(
+        (post) => groupIds.size === 0 || groupIds.has(post.group_id)
+      );
       const agreementPrivPem = localStorage.getItem("agreement_private_pem");
       const repairedGroups = new Set();
       const decrypted = [];
