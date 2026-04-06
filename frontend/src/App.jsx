@@ -74,24 +74,24 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!token) return;
+    if (!token || !userId) return;
     handleFetchPosts();
     const interval = setInterval(() => {
       handleFetchPosts();
     }, 8000);
     return () => clearInterval(interval);
-  }, [token]);
+  }, [token, userId]);
 
   useEffect(() => {
-    if (!token) return;
+    if (!token || !userId) return;
     refreshGroups();
-  }, [token]);
+  }, [token, userId]);
 
   useEffect(() => {
-    if (!token) return;
+    if (!token || !userId) return;
     if (!postGroupName) return;
     handleFetchPosts();
-  }, [postGroupName, token]);
+  }, [postGroupName, token, userId]);
 
   const refreshGroups = async () => {
     if (!token) return;
