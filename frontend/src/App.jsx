@@ -10,6 +10,7 @@ import {
   getWrappedKey,
   getCaCertificate,
   getPublicKeys,
+  getGroup,
   getGroupByName,
   listMyGroups,
   loginUser,
@@ -110,8 +111,18 @@ export default function App() {
       setTokenState(data.access_token);
       setAuthStatus("Registered and logged in.");
       const dataMe = await fetchMe();
-      setUserId(String(dataMe.id));
-      setMe({ id: String(dataMe.id), username: dataMe.username });
+      const currentUserId = String(dataMe.id);
+      setUserId(currentUserId);
+      setMe({ id: currentUserId, username: dataMe.username });
+      const keyOwner = localStorage.getItem("key_owner_user_id");
+      if (keyOwner && keyOwner !== currentUserId) {
+        localStorage.removeItem("signing_private_pem");
+        localStorage.removeItem("agreement_private_pem");
+        localStorage.removeItem("cert_pem");
+        localStorage.removeItem("app_cert_id");
+        localStorage.removeItem("key_owner_user_id");
+        setCertStatus("Keys belonged to another user. Please register keys again.");
+      }
       await refreshGroups();
       await handleFetchPosts();
     } catch (err) {
@@ -129,8 +140,18 @@ export default function App() {
       setTokenState(data.access_token);
       setAuthStatus("Logged in.");
       const dataMe = await fetchMe();
-      setUserId(String(dataMe.id));
-      setMe({ id: String(dataMe.id), username: dataMe.username });
+      const currentUserId = String(dataMe.id);
+      setUserId(currentUserId);
+      setMe({ id: currentUserId, username: dataMe.username });
+      const keyOwner = localStorage.getItem("key_owner_user_id");
+      if (keyOwner && keyOwner !== currentUserId) {
+        localStorage.removeItem("signing_private_pem");
+        localStorage.removeItem("agreement_private_pem");
+        localStorage.removeItem("cert_pem");
+        localStorage.removeItem("app_cert_id");
+        localStorage.removeItem("key_owner_user_id");
+        setCertStatus("Keys belonged to another user. Please register keys again.");
+      }
       await refreshGroups();
       await handleFetchPosts();
     } catch (err) {
@@ -161,6 +182,7 @@ export default function App() {
       const agreementPriv = await exportPrivateKeyPem(keys.agreement.privateKey);
       localStorage.setItem("signing_private_pem", signingPriv);
       localStorage.setItem("agreement_private_pem", agreementPriv);
+      localStorage.setItem("key_owner_user_id", String(userId));
       const cert = await requestCertificate({
         user_id: String(userId),
         username,
@@ -196,7 +218,10 @@ export default function App() {
     setFlowStatus("Adding member...");
     try {
       await addMemberByName(groupName, memberName);
-      setFlowStatus("Member added.");
+      const group = await getGroupByName(groupName);
+      const memberIds = group.members.map((id) => String(id));
+      await createGroupKeys(String(group.id), memberIds);
+      setFlowStatus("Member added and key wrapped.");
       await refreshGroups();
       await handleFetchPosts();
     } catch (err) {
@@ -209,6 +234,10 @@ export default function App() {
     try {
       if (!userId) throw new Error("Missing user ID");
       if (!postGroupName) throw new Error("Enter a group name to post");
+      const keyOwner = localStorage.getItem("key_owner_user_id");
+      if (keyOwner && keyOwner !== String(userId)) {
+        throw new Error("Local keys belong to another user. Register keys again.");
+      }
       const certId = localStorage.getItem("app_cert_id");
       if (!certId) throw new Error("Register keys + certificate first");
       const group = await getGroupByName(postGroupName);
@@ -216,7 +245,8 @@ export default function App() {
       try {
         wrapped = await getCurrentWrappedKey(group.id, userId);
       } catch (err) {
-        await createGroupKeys(String(group.id), [String(userId)]);
+        const memberIds = group.members.map((id) => String(id));
+        await createGroupKeys(String(group.id), memberIds);
         wrapped = await getCurrentWrappedKey(group.id, userId);
       }
       const agreementPrivPem = localStorage.getItem("agreement_private_pem");
@@ -254,6 +284,7 @@ export default function App() {
     } catch (err) {
       const message =
         (err && err.message) ||
+        (err && err.name) ||
         (typeof err === "string" ? err : JSON.stringify(err));
       console.error("Post failed:", err);
       setFlowStatus(message || "Post failed");
@@ -265,6 +296,7 @@ export default function App() {
     try {
       const posts = await listAllPosts();
       const agreementPrivPem = localStorage.getItem("agreement_private_pem");
+      const repairedGroups = new Set();
       const decrypted = [];
       for (const post of posts) {
         let plaintext = null;
@@ -291,6 +323,37 @@ export default function App() {
           }
         } catch {
           plaintext = null;
+          if (
+            agreementPrivPem &&
+            userId &&
+            !repairedGroups.has(post.group_id)
+          ) {
+            try {
+              const group = await getGroup(post.group_id);
+              const memberIds = group.members.map((id) => String(id));
+              await createGroupKeys(String(group.id), memberIds);
+              repairedGroups.add(post.group_id);
+              const wrapped = await getWrappedKey(
+                post.group_id,
+                post.key_version,
+                userId
+              );
+              const context = `${post.group_id}:${wrapped.version}:${userId}`;
+              const groupKey = await unwrapGroupKey(
+                wrapped.wrapped_key,
+                agreementPrivPem,
+                context
+              );
+              plaintext = await decryptPost(
+                groupKey,
+                post.nonce,
+                post.ciphertext,
+                `group:${post.group_id}`
+              );
+            } catch {
+              plaintext = null;
+            }
+          }
         }
         try {
           const keys = await getPublicKeys(String(post.author_id));

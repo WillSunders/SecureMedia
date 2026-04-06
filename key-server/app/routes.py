@@ -96,11 +96,34 @@ def get_public_keys(user_id: str):
 @router.post("/groups/{group_id}/keys/create", response_model=GroupKeysCreateResponse)
 def create_group_keys(group_id: str, payload: GroupKeysCreateRequest):
     with get_session() as session:
-        version = 1
-        group_key = generate_group_key()
-        session.add(GroupKey(group_id=group_id, version=version, key_bytes=group_key))
+        max_version = session.scalar(
+            select(func.max(GroupKey.version)).where(GroupKey.group_id == group_id)
+        )
+        if max_version:
+            version = max_version
+            group_key = session.scalar(
+                select(GroupKey.key_bytes).where(
+                    GroupKey.group_id == group_id, GroupKey.version == version
+                )
+            )
+            if not group_key:
+                raise HTTPException(status_code=404, detail="Group key not found")
+        else:
+            version = 1
+            group_key = generate_group_key()
+            session.add(GroupKey(group_id=group_id, version=version, key_bytes=group_key))
         wrapped = {}
         for member_id in payload.member_user_ids:
+            existing = session.scalar(
+                select(WrappedKey.wrapped_key).where(
+                    WrappedKey.group_id == group_id,
+                    WrappedKey.version == version,
+                    WrappedKey.user_id == member_id,
+                )
+            )
+            if existing:
+                wrapped[member_id] = existing
+                continue
             pk = session.get(PublicKeyBundle, member_id)
             if not pk:
                 raise HTTPException(

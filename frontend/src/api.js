@@ -119,6 +119,23 @@ export async function getGroupByName(groupName) {
   return res.json();
 }
 
+export async function getGroup(groupId) {
+  const res = await fetch(`${appServer}/groups/${groupId}`, {
+    headers: { ...authHeaders() }
+  });
+  if (!res.ok) {
+    let detail = "";
+    try {
+      const data = await res.json();
+      detail = data.detail ? `: ${data.detail}` : "";
+    } catch {
+      detail = "";
+    }
+    throw new Error(`Get group failed${detail}`);
+  }
+  return res.json();
+}
+
 export async function listMyGroups() {
   const res = await fetch(`${appServer}/groups`, {
     headers: { ...authHeaders() }
