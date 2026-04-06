@@ -82,6 +82,15 @@ export async function createGroup(name) {
   return res.json();
 }
 
+export async function deleteGroup(groupId) {
+  const res = await fetch(`${appServer}/groups/${groupId}`, {
+    method: "DELETE",
+    headers: { ...authHeaders() }
+  });
+  if (!res.ok) throw new Error("Delete group failed");
+  return res.json();
+}
+
 export async function addMember(groupId, userId) {
   const res = await fetch(`${appServer}/groups/${groupId}/members`, {
     method: "POST",

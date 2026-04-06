@@ -3,11 +3,19 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from sqlalchemy import select
+from sqlalchemy import delete, select
 
 from .auth import create_access_token, decode_access_token, hash_password, verify_password
 from .db import get_session
-from .models import Certificate, Group, Membership, Post, User
+from .models import (
+    Certificate,
+    Group,
+    GroupKeyVersion,
+    Membership,
+    Post,
+    User,
+    WrappedKey,
+)
 from .schemas import (
     CertificateRegisterRequest,
     CertificateRegisterResponse,
@@ -278,6 +286,26 @@ def remove_member(
         if not membership:
             raise HTTPException(status_code=404, detail="Membership not found")
         membership.active = False
+        session.commit()
+        return {"status": "ok"}
+
+
+@router.delete("/groups/{group_id}")
+def delete_group(group_id: int, user_id: int = Depends(get_current_user_id)):
+    with get_session() as session:
+        group = session.get(Group, group_id)
+        if not group:
+            raise HTTPException(status_code=404, detail="Group not found")
+        if group.owner_id != user_id:
+            raise HTTPException(status_code=403, detail="Only owner can delete group")
+        version_ids = select(GroupKeyVersion.id).where(GroupKeyVersion.group_id == group_id)
+        session.execute(
+            delete(WrappedKey).where(WrappedKey.group_key_version_id.in_(version_ids))
+        )
+        session.execute(delete(GroupKeyVersion).where(GroupKeyVersion.group_id == group_id))
+        session.execute(delete(Post).where(Post.group_id == group_id))
+        session.execute(delete(Membership).where(Membership.group_id == group_id))
+        session.delete(group)
         session.commit()
         return {"status": "ok"}
 

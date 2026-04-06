@@ -4,6 +4,7 @@ import {
   createGroupKeys,
   createGroup,
   createPostByName,
+  deleteGroup,
   fetchMe,
   getToken,
   getCurrentWrappedKey,
@@ -115,7 +116,17 @@ export default function App() {
       setUserId(currentUserId);
       setMe({ id: currentUserId, username: dataMe.username });
       const keyOwner = localStorage.getItem("key_owner_user_id");
-      if (keyOwner && keyOwner !== currentUserId) {
+      const hasLegacyKeys =
+        localStorage.getItem("signing_private_pem") ||
+        localStorage.getItem("agreement_private_pem") ||
+        localStorage.getItem("app_cert_id");
+      if (!keyOwner && hasLegacyKeys) {
+        localStorage.removeItem("signing_private_pem");
+        localStorage.removeItem("agreement_private_pem");
+        localStorage.removeItem("cert_pem");
+        localStorage.removeItem("app_cert_id");
+        setCertStatus("Legacy keys detected. Please register keys again.");
+      } else if (keyOwner && keyOwner !== currentUserId) {
         localStorage.removeItem("signing_private_pem");
         localStorage.removeItem("agreement_private_pem");
         localStorage.removeItem("cert_pem");
@@ -144,7 +155,17 @@ export default function App() {
       setUserId(currentUserId);
       setMe({ id: currentUserId, username: dataMe.username });
       const keyOwner = localStorage.getItem("key_owner_user_id");
-      if (keyOwner && keyOwner !== currentUserId) {
+      const hasLegacyKeys =
+        localStorage.getItem("signing_private_pem") ||
+        localStorage.getItem("agreement_private_pem") ||
+        localStorage.getItem("app_cert_id");
+      if (!keyOwner && hasLegacyKeys) {
+        localStorage.removeItem("signing_private_pem");
+        localStorage.removeItem("agreement_private_pem");
+        localStorage.removeItem("cert_pem");
+        localStorage.removeItem("app_cert_id");
+        setCertStatus("Legacy keys detected. Please register keys again.");
+      } else if (keyOwner && keyOwner !== currentUserId) {
         localStorage.removeItem("signing_private_pem");
         localStorage.removeItem("agreement_private_pem");
         localStorage.removeItem("cert_pem");
@@ -229,12 +250,36 @@ export default function App() {
     }
   };
 
+  const handleDeleteGroup = async (groupId, name) => {
+    if (!window.confirm(`Delete group "${name}"? This cannot be undone.`)) {
+      return;
+    }
+    setFlowStatus("Deleting group...");
+    try {
+      await deleteGroup(groupId);
+      if (postGroupName === name) setPostGroupName("");
+      if (groupName === name) setGroupName("");
+      setFlowStatus("Group deleted.");
+      await refreshGroups();
+      await handleFetchPosts();
+    } catch (err) {
+      setFlowStatus(err.message || "Delete group failed");
+    }
+  };
+
   const handlePost = async () => {
     setFlowStatus("Encrypting and posting...");
     try {
       if (!userId) throw new Error("Missing user ID");
       if (!postGroupName) throw new Error("Enter a group name to post");
       const keyOwner = localStorage.getItem("key_owner_user_id");
+      const hasLegacyKeys =
+        localStorage.getItem("signing_private_pem") ||
+        localStorage.getItem("agreement_private_pem") ||
+        localStorage.getItem("app_cert_id");
+      if (!keyOwner && hasLegacyKeys) {
+        throw new Error("Legacy keys detected. Register keys again.");
+      }
       if (keyOwner && keyOwner !== String(userId)) {
         throw new Error("Local keys belong to another user. Register keys again.");
       }
@@ -471,6 +516,15 @@ export default function App() {
                         </span>
                       </div>
                     </div>
+                    {String(group.owner_id) === String(userId) ? (
+                      <button
+                        type="button"
+                        className="secondary"
+                        onClick={() => handleDeleteGroup(group.id, group.name)}
+                      >
+                        Delete
+                      </button>
+                    ) : null}
                   </div>
                 </article>
               ))}
