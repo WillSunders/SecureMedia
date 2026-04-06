@@ -313,6 +313,44 @@ body {
   background: #111827;
 }
 
+details {
+  position: relative;
+}
+
+details summary {
+  list-style: none;
+  cursor: pointer;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: #111827;
+  color: #fff;
+  font-weight: 600;
+}
+
+details summary::-webkit-details-marker {
+  display: none;
+}
+
+.member-list {
+  margin-top: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.member-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 0.9rem;
+}
+
+.member-row .muted {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
 .auth .status {
   font-size: 0.85rem;
   color: var(--muted);

@@ -5,7 +5,9 @@ import {
   createGroup,
   createPostByName,
   deleteGroup,
+  getGroupMembers,
   leaveGroup,
+  removeMember,
   fetchMe,
   getToken,
   getCurrentWrappedKey,
@@ -55,6 +57,7 @@ export default function App() {
   const [flowStatus, setFlowStatus] = useState("");
   const [myGroups, setMyGroups] = useState([]);
   const [groupMap, setGroupMap] = useState({});
+  const [groupMembers, setGroupMembers] = useState({});
   const [me, setMe] = useState({ id: "", username: "" });
 
   useEffect(() => {
@@ -324,6 +327,43 @@ export default function App() {
     }
   };
 
+  const handleRemoveMember = async (groupId, member) => {
+    if (!window.confirm(`Remove @${member.username} from this group?`)) {
+      return;
+    }
+    setFlowStatus("Removing member...");
+    setGroupMembers((prev) => ({
+      ...prev,
+      [groupId]: (prev[groupId] || []).filter(
+        (item) => String(item.id) !== String(member.id)
+      )
+    }));
+    try {
+      await removeMember(groupId, member.id);
+      const members = await getGroupMembers(groupId);
+      const memberIds = members.map((item) => String(item.id));
+      if (memberIds.length) {
+        await rotateGroupKeys(String(groupId), memberIds);
+      }
+      setGroupMembers((prev) => ({ ...prev, [groupId]: members }));
+      setFlowStatus("Member removed.");
+      await refreshGroups();
+      await handleFetchPosts();
+    } catch (err) {
+      await loadGroupMembers(groupId);
+      setFlowStatus(err.message || "Remove member failed");
+    }
+  };
+
+  const loadGroupMembers = async (groupId) => {
+    try {
+      const members = await getGroupMembers(groupId);
+      setGroupMembers((prev) => ({ ...prev, [groupId]: members }));
+    } catch (err) {
+      setFlowStatus(err.message || "Fetch members failed");
+    }
+  };
+
   const handlePost = async () => {
     setFlowStatus("Encrypting and posting...");
     try {
@@ -580,13 +620,38 @@ export default function App() {
                       </div>
                     </div>
                     {String(group.owner_id) === String(userId) ? (
-                      <button
-                        type="button"
-                        className="secondary"
-                        onClick={() => handleDeleteGroup(group.id, group.name)}
-                      >
-                        Delete
-                      </button>
+                      <details onToggle={(e) => {
+                        if (e.currentTarget.open) {
+                          loadGroupMembers(group.id);
+                        }
+                      }}>
+                        <summary className="secondary">Members</summary>
+                        <div className="member-list">
+                          <button
+                            type="button"
+                            className="secondary"
+                            onClick={() => handleDeleteGroup(group.id, group.name)}
+                          >
+                            Delete group
+                          </button>
+                          {(groupMembers[group.id] || []).map((member) => (
+                            <div key={member.id} className="member-row">
+                              <span>@{member.username}</span>
+                              {String(member.id) === String(userId) ? (
+                                <span className="muted">Owner</span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  className="secondary"
+                                  onClick={() => handleRemoveMember(group.id, member)}
+                                >
+                                  Remove
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </details>
                     ) : (
                       <button
                         type="button"

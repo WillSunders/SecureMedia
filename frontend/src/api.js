@@ -110,6 +110,15 @@ export async function addMember(groupId, userId) {
   return res.json();
 }
 
+export async function removeMember(groupId, userId) {
+  const res = await fetch(`${appServer}/groups/${groupId}/members/${userId}`, {
+    method: "DELETE",
+    headers: { ...authHeaders() }
+  });
+  if (!res.ok) throw new Error("Remove member failed");
+  return res.json();
+}
+
 export async function addMemberByName(groupName, username) {
   const res = await fetch(`${appServer}/groups/by-name/${groupName}/members`, {
     method: "POST",
@@ -151,6 +160,14 @@ export async function getGroup(groupId) {
     }
     throw new Error(`Get group failed${detail}`);
   }
+  return res.json();
+}
+
+export async function getGroupMembers(groupId) {
+  const res = await fetch(`${appServer}/groups/${groupId}/members`, {
+    headers: { ...authHeaders() }
+  });
+  if (!res.ok) throw new Error("Fetch group members failed");
   return res.json();
 }
 

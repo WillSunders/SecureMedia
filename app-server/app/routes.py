@@ -21,6 +21,7 @@ from .schemas import (
     CertificateRegisterResponse,
     GroupCreateRequest,
     GroupMemberAddRequest,
+    GroupMemberInfo,
     GroupListResponse,
     GroupResponse,
     LoginRequest,
@@ -190,6 +191,32 @@ def list_my_groups(user_id: int = Depends(get_current_user_id)):
                 )
             )
         return groups
+
+
+@router.get("/groups/{group_id}/members", response_model=list[GroupMemberInfo])
+def list_group_members(group_id: int, user_id: int = Depends(get_current_user_id)):
+    with get_session() as session:
+        group = session.get(Group, group_id)
+        if not group:
+            raise HTTPException(status_code=404, detail="Group not found")
+        if group.owner_id != user_id:
+            raise HTTPException(status_code=403, detail="Only owner can view members")
+        memberships = session.scalars(
+            select(Membership).where(
+                Membership.group_id == group_id, Membership.active == True
+            )
+        ).all()
+        members = []
+        for membership in memberships:
+            user = session.get(User, membership.user_id)
+            if not user:
+                continue
+            members.append(
+                GroupMemberInfo(
+                    id=user.id, username=user.username, role=membership.role
+                )
+            )
+        return members
 
 
 @router.post("/groups/{group_id}/members")

@@ -54,6 +54,12 @@ class GroupListResponse(BaseModel):
     owner_username: str | None = None
 
 
+class GroupMemberInfo(BaseModel):
+    id: int
+    username: str
+    role: str
+
+
 class PostCreateRequest(BaseModel):
     ciphertext: str = Field(..., description="Base64 ciphertext")
     nonce: str = Field(..., description="Base64 nonce")
