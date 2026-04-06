@@ -91,6 +91,15 @@ export async function deleteGroup(groupId) {
   return res.json();
 }
 
+export async function leaveGroup(groupId) {
+  const res = await fetch(`${appServer}/groups/${groupId}/leave`, {
+    method: "POST",
+    headers: { ...authHeaders() }
+  });
+  if (!res.ok) throw new Error("Leave group failed");
+  return res.json();
+}
+
 export async function addMember(groupId, userId) {
   const res = await fetch(`${appServer}/groups/${groupId}/members`, {
     method: "POST",
@@ -251,6 +260,25 @@ export async function createGroupKeys(groupId, memberUserIds) {
       detail = "";
     }
     throw new Error(`Create group keys failed${detail}`);
+  }
+  return res.json();
+}
+
+export async function rotateGroupKeys(groupId, memberUserIds) {
+  const res = await fetch(`${keyServer}/groups/${groupId}/keys/rotate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ group_id: String(groupId), member_user_ids: memberUserIds })
+  });
+  if (!res.ok) {
+    let detail = "";
+    try {
+      const data = await res.json();
+      detail = data.detail ? `: ${data.detail}` : "";
+    } catch {
+      detail = "";
+    }
+    throw new Error(`Rotate group keys failed${detail}`);
   }
   return res.json();
 }

@@ -5,6 +5,7 @@ import {
   createGroup,
   createPostByName,
   deleteGroup,
+  leaveGroup,
   fetchMe,
   getToken,
   getCurrentWrappedKey,
@@ -21,7 +22,8 @@ import {
   setToken,
   addMemberByName,
   listPosts,
-  listAllPosts
+  listAllPosts,
+  rotateGroupKeys
 } from "./api.js";
 import {
   decryptPost,
@@ -294,6 +296,34 @@ export default function App() {
     }
   };
 
+  const handleLeaveGroup = async (groupId, name) => {
+    if (!window.confirm(`Leave group "${name}"?`)) {
+      return;
+    }
+    setFlowStatus("Leaving group...");
+    setFeedData((prev) =>
+      prev.map((post) =>
+        post.group_id === groupId ? { ...post, plaintext: null } : post
+      )
+    );
+    try {
+      const group = await getGroup(groupId);
+      const remaining = group.members.filter((id) => String(id) !== String(userId));
+      await leaveGroup(groupId);
+      if (remaining.length) {
+        const memberIds = remaining.map((id) => String(id));
+        await rotateGroupKeys(String(groupId), memberIds);
+      }
+      if (postGroupName === name) setPostGroupName("");
+      if (groupName === name) setGroupName("");
+      setFlowStatus("Left group.");
+      await refreshGroups();
+      await handleFetchPosts();
+    } catch (err) {
+      setFlowStatus(err.message || "Leave group failed");
+    }
+  };
+
   const handlePost = async () => {
     setFlowStatus("Encrypting and posting...");
     try {
@@ -557,7 +587,15 @@ export default function App() {
                       >
                         Delete
                       </button>
-                    ) : null}
+                    ) : (
+                      <button
+                        type="button"
+                        className="secondary"
+                        onClick={() => handleLeaveGroup(group.id, group.name)}
+                      >
+                        Leave
+                      </button>
+                    )}
                   </div>
                 </article>
               ))}

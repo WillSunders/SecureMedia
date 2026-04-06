@@ -187,15 +187,36 @@ def get_current_key(group_id: str, user_id: str):
         )
         if not max_version:
             raise HTTPException(status_code=404, detail="Group key not found")
-        wrapped = session.scalar(
-            select(WrappedKey.wrapped_key).where(
+        group_key = session.scalar(
+            select(GroupKey.key_bytes).where(
+                GroupKey.group_id == group_id,
+                GroupKey.version == max_version,
+            )
+        )
+        pk = session.get(PublicKeyBundle, user_id)
+        if not group_key or not pk:
+            raise HTTPException(status_code=404, detail="Wrapped key not found")
+        context = f"{group_id}:{max_version}:{user_id}".encode("utf-8")
+        wrapped = wrap_group_key(group_key, pk.agreement_public_key_pem, context)
+        existing = session.scalar(
+            select(WrappedKey).where(
                 WrappedKey.group_id == group_id,
                 WrappedKey.version == max_version,
                 WrappedKey.user_id == user_id,
             )
         )
-        if not wrapped:
-            raise HTTPException(status_code=404, detail="Wrapped key not found")
+        if existing:
+            existing.wrapped_key = wrapped
+        else:
+            session.add(
+                WrappedKey(
+                    group_id=group_id,
+                    version=max_version,
+                    user_id=user_id,
+                    wrapped_key=wrapped,
+                )
+            )
+        session.commit()
         return WrappedKeyResponse(
             group_id=group_id,
             version=max_version,
@@ -210,15 +231,35 @@ def get_current_key(group_id: str, user_id: str):
 )
 def get_wrapped_key(group_id: str, version: int, user_id: str):
     with get_session() as session:
-        wrapped = session.scalar(
-            select(WrappedKey.wrapped_key).where(
+        group_key = session.scalar(
+            select(GroupKey.key_bytes).where(
+                GroupKey.group_id == group_id, GroupKey.version == version
+            )
+        )
+        pk = session.get(PublicKeyBundle, user_id)
+        if not group_key or not pk:
+            raise HTTPException(status_code=404, detail="Wrapped key not found")
+        context = f"{group_id}:{version}:{user_id}".encode("utf-8")
+        wrapped = wrap_group_key(group_key, pk.agreement_public_key_pem, context)
+        existing = session.scalar(
+            select(WrappedKey).where(
                 WrappedKey.group_id == group_id,
                 WrappedKey.version == version,
                 WrappedKey.user_id == user_id,
             )
         )
-        if not wrapped:
-            raise HTTPException(status_code=404, detail="Wrapped key not found")
+        if existing:
+            existing.wrapped_key = wrapped
+        else:
+            session.add(
+                WrappedKey(
+                    group_id=group_id,
+                    version=version,
+                    user_id=user_id,
+                    wrapped_key=wrapped,
+                )
+            )
+        session.commit()
         return WrappedKeyResponse(
             group_id=group_id, version=version, user_id=user_id, wrapped_key=wrapped
         )

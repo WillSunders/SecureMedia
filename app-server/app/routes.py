@@ -290,6 +290,31 @@ def remove_member(
         return {"status": "ok"}
 
 
+@router.post("/groups/{group_id}/leave")
+def leave_group(
+    group_id: int,
+    user_id: int = Depends(get_current_user_id),
+):
+    with get_session() as session:
+        group = session.get(Group, group_id)
+        if not group:
+            raise HTTPException(status_code=404, detail="Group not found")
+        if group.owner_id == user_id:
+            raise HTTPException(status_code=403, detail="Owner cannot leave group")
+        membership = session.scalar(
+            select(Membership).where(
+                Membership.group_id == group_id,
+                Membership.user_id == user_id,
+                Membership.active == True,
+            )
+        )
+        if not membership:
+            raise HTTPException(status_code=404, detail="Membership not found")
+        membership.active = False
+        session.commit()
+        return {"status": "ok"}
+
+
 @router.delete("/groups/{group_id}")
 def delete_group(group_id: int, user_id: int = Depends(get_current_user_id)):
     with get_session() as session:
