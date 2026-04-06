@@ -125,15 +125,16 @@ export default function App() {
         localStorage.removeItem("agreement_private_pem");
         localStorage.removeItem("cert_pem");
         localStorage.removeItem("app_cert_id");
-        setCertStatus("Legacy keys detected. Please register keys again.");
+        setCertStatus("Legacy keys detected. Regenerating credentials.");
       } else if (keyOwner && keyOwner !== currentUserId) {
         localStorage.removeItem("signing_private_pem");
         localStorage.removeItem("agreement_private_pem");
         localStorage.removeItem("cert_pem");
         localStorage.removeItem("app_cert_id");
         localStorage.removeItem("key_owner_user_id");
-        setCertStatus("Keys belonged to another user. Please register keys again.");
+        setCertStatus("Keys belonged to another user. Regenerating credentials.");
       }
+      await handleKeyRegistration(currentUserId, dataMe.username);
       await refreshGroups();
       await handleFetchPosts();
     } catch (err) {
@@ -164,15 +165,16 @@ export default function App() {
         localStorage.removeItem("agreement_private_pem");
         localStorage.removeItem("cert_pem");
         localStorage.removeItem("app_cert_id");
-        setCertStatus("Legacy keys detected. Please register keys again.");
+        setCertStatus("Legacy keys detected. Regenerating credentials.");
       } else if (keyOwner && keyOwner !== currentUserId) {
         localStorage.removeItem("signing_private_pem");
         localStorage.removeItem("agreement_private_pem");
         localStorage.removeItem("cert_pem");
         localStorage.removeItem("app_cert_id");
         localStorage.removeItem("key_owner_user_id");
-        setCertStatus("Keys belonged to another user. Please register keys again.");
+        setCertStatus("Keys belonged to another user. Regenerating credentials.");
       }
+      await handleKeyRegistration(currentUserId, dataMe.username);
       await refreshGroups();
       await handleFetchPosts();
     } catch (err) {
@@ -193,7 +195,7 @@ export default function App() {
     setMyGroups([]);
   };
 
-  const handleKeyRegistration = async () => {
+  const handleKeyRegistration = async (targetUserId = userId, targetUsername = username) => {
     setCertStatus("Generating keys...");
     try {
       const keys = await generateUserKeys();
@@ -203,15 +205,15 @@ export default function App() {
       const agreementPriv = await exportPrivateKeyPem(keys.agreement.privateKey);
       localStorage.setItem("signing_private_pem", signingPriv);
       localStorage.setItem("agreement_private_pem", agreementPriv);
-      localStorage.setItem("key_owner_user_id", String(userId));
+      localStorage.setItem("key_owner_user_id", String(targetUserId));
       const cert = await requestCertificate({
-        user_id: String(userId),
-        username,
+        user_id: String(targetUserId),
+        username: targetUsername,
         signing_public_key_pem: signingPub,
         agreement_public_key_pem: agreementPub
       });
       localStorage.setItem("cert_pem", cert.cert_pem);
-      const appCert = await registerCertificate(cert.cert_pem, Number(userId));
+      const appCert = await registerCertificate(cert.cert_pem, Number(targetUserId));
       localStorage.setItem("app_cert_id", String(appCert.cert_id));
       setCertStatus("Keys registered and certificate issued.");
     } catch (err) {
@@ -278,13 +280,13 @@ export default function App() {
         localStorage.getItem("agreement_private_pem") ||
         localStorage.getItem("app_cert_id");
       if (!keyOwner && hasLegacyKeys) {
-        throw new Error("Legacy keys detected. Register keys again.");
+        throw new Error("Legacy keys detected. Log out and log in again.");
       }
       if (keyOwner && keyOwner !== String(userId)) {
-        throw new Error("Local keys belong to another user. Register keys again.");
+        throw new Error("Local keys belong to another user. Log out and log in again.");
       }
       const certId = localStorage.getItem("app_cert_id");
-      if (!certId) throw new Error("Register keys + certificate first");
+      if (!certId) throw new Error("Credentials missing. Log out and log in again.");
       const group = await getGroupByName(postGroupName);
       let wrapped;
       try {
@@ -467,9 +469,6 @@ export default function App() {
               readOnly
               placeholder="@username"
             />
-            <button type="button" onClick={handleKeyRegistration}>
-              Generate keys + request certificate
-            </button>
             <div className="status">{caStatus}</div>
             <div className="status">{certStatus}</div>
           </div>
