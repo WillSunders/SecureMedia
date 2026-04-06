@@ -106,7 +106,16 @@ export async function getGroupByName(groupName) {
   const res = await fetch(`${appServer}/groups/by-name/${groupName}`, {
     headers: { ...authHeaders() }
   });
-  if (!res.ok) throw new Error("Get group failed");
+  if (!res.ok) {
+    let detail = "";
+    try {
+      const data = await res.json();
+      detail = data.detail ? `: ${data.detail}` : "";
+    } catch {
+      detail = "";
+    }
+    throw new Error(`Get group failed${detail}`);
+  }
   return res.json();
 }
 
@@ -134,7 +143,16 @@ export async function createPostByName(groupName, payload) {
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify(payload)
   });
-  if (!res.ok) throw new Error("Create post failed");
+  if (!res.ok) {
+    let detail = "";
+    try {
+      const data = await res.json();
+      detail = data.detail ? `: ${data.detail}` : "";
+    } catch {
+      detail = "";
+    }
+    throw new Error(`Create post failed${detail}`);
+  }
   return res.json();
 }
 

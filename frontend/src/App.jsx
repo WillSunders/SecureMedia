@@ -82,6 +82,11 @@ export default function App() {
 
   useEffect(() => {
     if (!token) return;
+    refreshGroups();
+  }, [token]);
+
+  useEffect(() => {
+    if (!token) return;
     if (!postGroupName) return;
     handleFetchPosts();
   }, [postGroupName, token]);
@@ -202,8 +207,18 @@ export default function App() {
   const handlePost = async () => {
     setFlowStatus("Encrypting and posting...");
     try {
+      if (!userId) throw new Error("Missing user ID");
+      if (!postGroupName) throw new Error("Enter a group name to post");
+      const certId = localStorage.getItem("app_cert_id");
+      if (!certId) throw new Error("Register keys + certificate first");
       const group = await getGroupByName(postGroupName);
-      const wrapped = await getCurrentWrappedKey(group.id, userId);
+      let wrapped;
+      try {
+        wrapped = await getCurrentWrappedKey(group.id, userId);
+      } catch (err) {
+        await createGroupKeys(String(group.id), [String(userId)]);
+        wrapped = await getCurrentWrappedKey(group.id, userId);
+      }
       const agreementPrivPem = localStorage.getItem("agreement_private_pem");
       if (!agreementPrivPem) throw new Error("Missing agreement private key");
       const context = `${group.id}:${wrapped.version}:${userId}`;
@@ -226,20 +241,22 @@ export default function App() {
         auth_tag: ""
       });
       const signature = await signMessage(signingPriv, payloadToSign);
-      const storedCertId = localStorage.getItem("app_cert_id");
-      const certId = Number(storedCertId || 1);
       await createPostByName(postGroupName, {
         ciphertext: encrypted.ciphertext,
         nonce: encrypted.iv,
         auth_tag: "",
         signature,
-        cert_id: certId,
+        cert_id: Number(certId),
         key_version: wrapped.version
       });
       setFlowStatus("Post sent.");
       await handleFetchPosts();
     } catch (err) {
-      setFlowStatus(err.message || "Post failed");
+      const message =
+        (err && err.message) ||
+        (typeof err === "string" ? err : JSON.stringify(err));
+      console.error("Post failed:", err);
+      setFlowStatus(message || "Post failed");
     }
   };
 
@@ -253,7 +270,7 @@ export default function App() {
         let plaintext = null;
         let verified = false;
         try {
-          if (agreementPrivPem) {
+          if (agreementPrivPem && userId) {
             const wrapped = await getWrappedKey(
               post.group_id,
               post.key_version,
