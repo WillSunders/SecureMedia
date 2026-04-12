@@ -18,8 +18,8 @@ docker compose up --build
 
 Then open:
 - Frontend: http://localhost:5173
-- App server health: http://localhost:8000/health
-- Key server health: http://localhost:8001/health
+- App server: http://localhost:8000
+- Key server: http://localhost:8001
 
 ## Local development (without Docker)
 ### Frontend
@@ -48,5 +48,5 @@ uvicorn app.main:app --reload --port 8001
 ```
 
 ## Notes
-- This is an early scaffold. Crypto operations, database schema, and full API endpoints are still in progress.
-- Frontend currently uses fake data for the UI.
+- Credentials (keys + certificate) are generated automatically on register/login.
+- Posts are encrypted client-side; the app server stores ciphertext only.

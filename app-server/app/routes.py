@@ -1,10 +1,8 @@
 import base64
 from datetime import datetime, timedelta, timezone
-
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import delete, select
-
 from .auth import create_access_token, decode_access_token, hash_password, verify_password
 from .db import get_session
 from .models import (
@@ -35,61 +33,51 @@ from .schemas import (
 router = APIRouter()
 security = HTTPBearer()
 
-
+#decodes a string into bytes
 def _b64d(value: str) -> bytes:
     return base64.b64decode(value.encode("utf-8"))
 
-
+#encodes bytes into a string
 def _b64(value: bytes) -> str:
     return base64.b64encode(value).decode("utf-8")
 
-
-def get_current_user_id(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-) -> int:
+#extracts userid from token 
+def get_current_user_id(credentials: HTTPAuthorizationCredentials = Depends(security)) -> int:
     return decode_access_token(credentials.credentials)
 
-
+#creates a new user and returns a JWT
 @router.post("/auth/register", response_model=TokenResponse)
 def register(payload: RegisterRequest):
     with get_session() as session:
         existing = session.scalar(select(User).where(User.username == payload.username))
-        if existing:
-            raise HTTPException(status_code=400, detail="Username already exists")
-        user = User(
-            username=payload.username,
-            password_hash=hash_password(payload.password),
-        )
+        if existing: raise HTTPException(status_code=400, detail="Username already exists")
+        user = User(username=payload.username,password_hash=hash_password(payload.password))
         session.add(user)
         session.commit()
         session.refresh(user)
         token = create_access_token(user.id)
         return TokenResponse(access_token=token)
 
-
+#verify user credentials and return a JWT
 @router.post("/auth/login", response_model=TokenResponse)
 def login(payload: LoginRequest):
     with get_session() as session:
         user = session.scalar(select(User).where(User.username == payload.username))
-        if not user or not verify_password(payload.password, user.password_hash):
-            raise HTTPException(status_code=401, detail="Invalid credentials")
+        if not user or not verify_password(payload.password, user.password_hash): raise HTTPException(status_code=401, detail="Invalid credentials")
         token = create_access_token(user.id)
         return TokenResponse(access_token=token)
 
-
+#return user id and username from JWT
 @router.get("/auth/me", response_model=MeResponse)
 def me(user_id: int = Depends(get_current_user_id)):
     with get_session() as session:
         user = session.get(User, user_id)
-        if not user:
-            raise HTTPException(status_code=404, detail="User not found")
+        if not user: raise HTTPException(status_code=404, detail="User not found")
         return MeResponse(id=user.id, username=user.username)
 
-
+#store users certificate in the app server
 @router.post("/certificates/register", response_model=CertificateRegisterResponse)
-def register_certificate(
-    payload: CertificateRegisterRequest, user_id: int = Depends(get_current_user_id)
-):
+def register_certificate(payload: CertificateRegisterRequest, user_id: int = Depends(get_current_user_id)):
     with get_session() as session:
         owner_id = payload.user_id or user_id
         cert = Certificate(
@@ -104,7 +92,7 @@ def register_certificate(
         session.refresh(cert)
         return CertificateRegisterResponse(cert_id=cert.id)
 
-
+#create a group and add the group creater as group owner
 @router.post("/groups", response_model=GroupResponse)
 def create_group(payload: GroupCreateRequest, user_id: int = Depends(get_current_user_id)):
     with get_session() as session:
@@ -123,18 +111,14 @@ def create_group(payload: GroupCreateRequest, user_id: int = Depends(get_current
             members=[user_id],
         )
 
-
+#return group details
 @router.get("/groups/{group_id}", response_model=GroupResponse)
 def get_group(group_id: int, user_id: int = Depends(get_current_user_id)):
     with get_session() as session:
         group = session.get(Group, group_id)
-        if not group:
-            raise HTTPException(status_code=404, detail="Group not found")
-        members = session.scalars(
-            select(Membership.user_id).where(Membership.group_id == group_id, Membership.active == True)
-        ).all()
-        if user_id not in members:
-            raise HTTPException(status_code=403, detail="Not a member")
+        if not group: raise HTTPException(status_code=404, detail="Group not found")
+        members = session.scalars(select(Membership.user_id).where(Membership.group_id == group_id, Membership.active == True)).all()
+        if user_id not in members: raise HTTPException(status_code=403, detail="Not a member")
         owner = session.get(User, group.owner_id)
         return GroupResponse(
             id=group.id,
@@ -144,20 +128,14 @@ def get_group(group_id: int, user_id: int = Depends(get_current_user_id)):
             members=members,
         )
 
-
+#return group details but uses group name as look up
 @router.get("/groups/by-name/{group_name}", response_model=GroupResponse)
 def get_group_by_name(group_name: str, user_id: int = Depends(get_current_user_id)):
     with get_session() as session:
         group = session.scalar(select(Group).where(Group.name == group_name))
-        if not group:
-            raise HTTPException(status_code=404, detail="Group not found")
-        members = session.scalars(
-            select(Membership.user_id).where(
-                Membership.group_id == group.id, Membership.active == True
-            )
-        ).all()
-        if user_id not in members:
-            raise HTTPException(status_code=403, detail="Not a member")
+        if not group: raise HTTPException(status_code=404, detail="Group not found")
+        members = session.scalars(select(Membership.user_id).where(Membership.group_id == group.id, Membership.active == True)).all()
+        if user_id not in members: raise HTTPException(status_code=403, detail="Not a member")
         owner = session.get(User, group.owner_id)
         return GroupResponse(
             id=group.id,
@@ -167,20 +145,15 @@ def get_group_by_name(group_name: str, user_id: int = Depends(get_current_user_i
             members=members,
         )
 
-
+#list all the groups the user is a member of
 @router.get("/groups", response_model=list[GroupListResponse])
 def list_my_groups(user_id: int = Depends(get_current_user_id)):
     with get_session() as session:
-        memberships = session.scalars(
-            select(Membership).where(
-                Membership.user_id == user_id, Membership.active == True
-            )
-        ).all()
+        memberships = session.scalars(select(Membership).where(Membership.user_id == user_id, Membership.active == True)).all()
         groups = []
         for membership in memberships:
             group = session.get(Group, membership.group_id)
-            if not group:
-                continue
+            if not group: continue
             owner = session.get(User, group.owner_id)
             groups.append(
                 GroupListResponse(
@@ -192,117 +165,76 @@ def list_my_groups(user_id: int = Depends(get_current_user_id)):
             )
         return groups
 
-
+#return group members for the owner
 @router.get("/groups/{group_id}/members", response_model=list[GroupMemberInfo])
 def list_group_members(group_id: int, user_id: int = Depends(get_current_user_id)):
     with get_session() as session:
         group = session.get(Group, group_id)
-        if not group:
-            raise HTTPException(status_code=404, detail="Group not found")
-        if group.owner_id != user_id:
-            raise HTTPException(status_code=403, detail="Only owner can view members")
-        memberships = session.scalars(
-            select(Membership).where(
-                Membership.group_id == group_id, Membership.active == True
-            )
-        ).all()
+        if not group: raise HTTPException(status_code=404, detail="Group not found")
+        if group.owner_id != user_id: raise HTTPException(status_code=403, detail="Only owner can view members")
+        memberships = session.scalars(select(Membership).where(Membership.group_id == group_id, Membership.active == True)).all()
         members = []
         for membership in memberships:
             user = session.get(User, membership.user_id)
-            if not user:
-                continue
-            members.append(
-                GroupMemberInfo(
-                    id=user.id, username=user.username, role=membership.role
-                )
-            )
+            if not user: continue
+            members.append(GroupMemberInfo(id=user.id, username=user.username, role=membership.role))
         return members
 
-
+#add a member to a group
 @router.post("/groups/{group_id}/members")
-def add_member(
-    group_id: int,
-    payload: GroupMemberAddRequest,
-    user_id: int = Depends(get_current_user_id),
-):
+def add_member(group_id: int, payload: GroupMemberAddRequest, user_id: int = Depends(get_current_user_id)):
     with get_session() as session:
         group = session.get(Group, group_id)
-        if not group:
-            raise HTTPException(status_code=404, detail="Group not found")
-        if group.owner_id != user_id:
-            raise HTTPException(status_code=403, detail="Only owner can add members")
+        if not group: raise HTTPException(status_code=404, detail="Group not found")
+        if group.owner_id != user_id: raise HTTPException(status_code=403, detail="Only owner can add members")
         member_id = payload.user_id
         if payload.username and not member_id:
             user = session.scalar(select(User).where(User.username == payload.username))
-            if not user:
-                raise HTTPException(status_code=404, detail="User not found")
+            if not user: raise HTTPException(status_code=404, detail="User not found")
             member_id = user.id
-        if not member_id:
-            raise HTTPException(status_code=400, detail="user_id or username required")
+        if not member_id: raise HTTPException(status_code=400, detail="user_id or username required")
         existing = session.scalar(
             select(Membership).where(
                 Membership.group_id == group_id,
                 Membership.user_id == member_id,
             )
         )
-        if existing:
-            existing.active = True
-        else:
-            session.add(
-                Membership(group_id=group_id, user_id=member_id, role="member")
-            )
+        if existing: existing.active = True
+        else: session.add(Membership(group_id=group_id, user_id=member_id, role="member"))
         session.commit()
         return {"status": "ok"}
 
-
+#add member to a group based on group name
 @router.post("/groups/by-name/{group_name}/members")
-def add_member_by_name(
-    group_name: str,
-    payload: GroupMemberAddRequest,
-    user_id: int = Depends(get_current_user_id),
-):
+def add_member_by_name(group_name: str, payload: GroupMemberAddRequest, user_id: int = Depends(get_current_user_id)):
     with get_session() as session:
         group = session.scalar(select(Group).where(Group.name == group_name))
-        if not group:
-            raise HTTPException(status_code=404, detail="Group not found")
-        if group.owner_id != user_id:
-            raise HTTPException(status_code=403, detail="Only owner can add members")
+        if not group: raise HTTPException(status_code=404, detail="Group not found")
+        if group.owner_id != user_id: raise HTTPException(status_code=403, detail="Only owner can add members")
         member_id = payload.user_id
         if payload.username and not member_id:
             user = session.scalar(select(User).where(User.username == payload.username))
-            if not user:
-                raise HTTPException(status_code=404, detail="User not found")
+            if not user: raise HTTPException(status_code=404, detail="User not found")
             member_id = user.id
-        if not member_id:
-            raise HTTPException(status_code=400, detail="user_id or username required")
+        if not member_id: raise HTTPException(status_code=400, detail="user_id or username required")
         existing = session.scalar(
             select(Membership).where(
                 Membership.group_id == group.id,
                 Membership.user_id == member_id,
             )
         )
-        if existing:
-            existing.active = True
-        else:
-            session.add(
-                Membership(group_id=group.id, user_id=member_id, role="member")
-            )
+        if existing: existing.active = True
+        else: session.add(Membership(group_id=group.id, user_id=member_id, role="member"))
         session.commit()
         return {"status": "ok"}
 
-
+#remove member froma group
 @router.delete("/groups/{group_id}/members/{member_id}")
-def remove_member(
-    group_id: int,
-    member_id: int,
-    user_id: int = Depends(get_current_user_id),
-):
+def remove_member(group_id: int, member_id: int, user_id: int = Depends(get_current_user_id)):
     with get_session() as session:
         group = session.get(Group, group_id)
-        if not group:
-            raise HTTPException(status_code=404, detail="Group not found")
-        if group.owner_id != user_id:
-            raise HTTPException(status_code=403, detail="Only owner can remove members")
+        if not group: raise HTTPException(status_code=404, detail="Group not found")
+        if group.owner_id != user_id: raise HTTPException(status_code=403, detail="Only owner can remove members")
         membership = session.scalar(
             select(Membership).where(
                 Membership.group_id == group_id,
@@ -310,24 +242,18 @@ def remove_member(
                 Membership.active == True,
             )
         )
-        if not membership:
-            raise HTTPException(status_code=404, detail="Membership not found")
+        if not membership: raise HTTPException(status_code=404, detail="Membership not found")
         membership.active = False
         session.commit()
         return {"status": "ok"}
 
-
+#user leaves a group
 @router.post("/groups/{group_id}/leave")
-def leave_group(
-    group_id: int,
-    user_id: int = Depends(get_current_user_id),
-):
+def leave_group(group_id: int, user_id: int = Depends(get_current_user_id)):
     with get_session() as session:
         group = session.get(Group, group_id)
-        if not group:
-            raise HTTPException(status_code=404, detail="Group not found")
-        if group.owner_id == user_id:
-            raise HTTPException(status_code=403, detail="Owner cannot leave group")
+        if not group: raise HTTPException(status_code=404, detail="Group not found")
+        if group.owner_id == user_id: raise HTTPException(status_code=403, detail="Owner cannot leave group")
         membership = session.scalar(
             select(Membership).where(
                 Membership.group_id == group_id,
@@ -335,25 +261,21 @@ def leave_group(
                 Membership.active == True,
             )
         )
-        if not membership:
-            raise HTTPException(status_code=404, detail="Membership not found")
+        if not membership: raise HTTPException(status_code=404, detail="Membership not found")
         membership.active = False
         session.commit()
         return {"status": "ok"}
 
-
+#group owner can delete a group
+#removes all posts related to the group
 @router.delete("/groups/{group_id}")
 def delete_group(group_id: int, user_id: int = Depends(get_current_user_id)):
     with get_session() as session:
         group = session.get(Group, group_id)
-        if not group:
-            raise HTTPException(status_code=404, detail="Group not found")
-        if group.owner_id != user_id:
-            raise HTTPException(status_code=403, detail="Only owner can delete group")
+        if not group: raise HTTPException(status_code=404, detail="Group not found")
+        if group.owner_id != user_id: raise HTTPException(status_code=403, detail="Only owner can delete group")
         version_ids = select(GroupKeyVersion.id).where(GroupKeyVersion.group_id == group_id)
-        session.execute(
-            delete(WrappedKey).where(WrappedKey.group_key_version_id.in_(version_ids))
-        )
+        session.execute(delete(WrappedKey).where(WrappedKey.group_key_version_id.in_(version_ids)))
         session.execute(delete(GroupKeyVersion).where(GroupKeyVersion.group_id == group_id))
         session.execute(delete(Post).where(Post.group_id == group_id))
         session.execute(delete(Membership).where(Membership.group_id == group_id))
@@ -361,13 +283,9 @@ def delete_group(group_id: int, user_id: int = Depends(get_current_user_id)):
         session.commit()
         return {"status": "ok"}
 
-
+#create a post
 @router.post("/groups/{group_id}/posts", response_model=PostResponse)
-def create_post(
-    group_id: int,
-    payload: PostCreateRequest,
-    user_id: int = Depends(get_current_user_id),
-):
+def create_post(group_id: int, payload: PostCreateRequest, user_id: int = Depends(get_current_user_id)):
     with get_session() as session:
         membership = session.scalar(
             select(Membership).where(
@@ -376,8 +294,7 @@ def create_post(
                 Membership.active == True,
             )
         )
-        if not membership:
-            raise HTTPException(status_code=403, detail="Not a member")
+        if not membership: raise HTTPException(status_code=403, detail="Not a member")
         post = Post(
             group_id=group_id,
             author_id=user_id,
@@ -404,17 +321,12 @@ def create_post(
             key_version=post.key_version,
         )
 
-
+#create a post but is identified by groupname
 @router.post("/groups/by-name/{group_name}/posts", response_model=PostResponse)
-def create_post_by_name(
-    group_name: str,
-    payload: PostCreateRequest,
-    user_id: int = Depends(get_current_user_id),
-):
+def create_post_by_name(group_name: str, payload: PostCreateRequest, user_id: int = Depends(get_current_user_id)):
     with get_session() as session:
         group = session.scalar(select(Group).where(Group.name == group_name))
-        if not group:
-            raise HTTPException(status_code=404, detail="Group not found")
+        if not group: raise HTTPException(status_code=404, detail="Group not found")
         membership = session.scalar(
             select(Membership).where(
                 Membership.group_id == group.id,
@@ -422,8 +334,7 @@ def create_post_by_name(
                 Membership.active == True,
             )
         )
-        if not membership:
-            raise HTTPException(status_code=403, detail="Not a member")
+        if not membership: raise HTTPException(status_code=403, detail="Not a member")
         post = Post(
             group_id=group.id,
             author_id=user_id,
@@ -451,7 +362,7 @@ def create_post_by_name(
             key_version=post.key_version,
         )
 
-
+#return all posts from a group
 @router.get("/groups/{group_id}/posts", response_model=list[PostResponse])
 def list_posts(group_id: int, user_id: int = Depends(get_current_user_id)):
     with get_session() as session:
@@ -472,7 +383,7 @@ def list_posts(group_id: int, user_id: int = Depends(get_current_user_id)):
             for post in posts
         ]
 
-
+#return all posts
 @router.get("/posts", response_model=list[PostResponse])
 def list_all_posts(user_id: int = Depends(get_current_user_id)):
     with get_session() as session:

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-
 @dataclass
 class InMemoryStore:
     ca_private_key_pem: str | None = None
@@ -14,6 +13,5 @@ class InMemoryStore:
     group_versions: dict[str, int] = field(default_factory=dict)
     group_keys_raw: dict[tuple[str, int], bytes] = field(default_factory=dict)
     wrapped_keys: dict[tuple[str, int, str], str] = field(default_factory=dict)
-
 
 STORE = InMemoryStore()
